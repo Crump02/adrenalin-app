@@ -1,8 +1,13 @@
 {
   "name": "adrenalin-app",
   "compatibility_date": "2026-08-06",
+  "main": "worker.js",
   "assets": {
     "directory": "./",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "kv_namespaces": [
+    { "binding": "ADRENALIN_KV", "id": "e6b57865cc9e4987970326f01caeaa25" }
+  ]
 }

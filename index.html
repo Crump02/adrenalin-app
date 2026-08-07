@@ -974,584 +974,7 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
 // ═══════════════════════════════════════════
 // CLIENT DATABASE
 // ═══════════════════════════════════════════
-const USERS = {
-  "dylan": { password:"AdrenalinDylan!847", role:"admin" },
-
-  "brad": {
-    password:"AdrenalinBrad!293",
-    role:"client",
-    profile:{
-      name:"Brad", sessions:0, weeks:0, currentWeight:"—",
-      coachMessage:"Welcome Brad — your programme and nutrition plan will be loaded before your first session. Let's get to work.",
-      lastSession:{title:"Not started",note:"First session notes will appear here."},
-      nextSession:{title:"Onboarding & Assessment",note:"Movement screening, baseline testing and programme walkthrough."},
-      goals:[{icon:"🎯",title:"Primary Goal",desc:"To be confirmed at onboarding.",status:"active"}],
-      programme:{name:"To be loaded",days:[]},
-      nutrition:{phase:"Setup Phase",kcal:2000,prot:160,carb:200,fat:50,notes:"Targets will be personalised after onboarding.",meals:[]},
-      sessions_history:[],
-      progress:[{metric:"Bodyweight",start:"—",current:"—",target:"—",pct:0}]
-    }
-  },
-
-  "palmz": {
-    password:"AdrenalinPalmz!571",
-    role:"client",
-    profile:{
-      name:"Palmz", sessions:0, weeks:0, currentWeight:"—",
-      coachMessage:"Welcome — your plan is being built. Check back before your first session.",
-      lastSession:{title:"Not started",note:"Session notes will appear here."},
-      nextSession:{title:"Session 1",note:"Let's get started."},
-      goals:[{icon:"💪",title:"Build & Get Lean",desc:"Goal to be confirmed at onboarding.",status:"active"}],
-      programme:{name:"To be loaded",days:[]},
-      nutrition:{phase:"Setup Phase",kcal:2000,prot:160,carb:200,fat:50,notes:"Personalised targets coming soon.",meals:[]},
-      sessions_history:[],
-      progress:[{metric:"Bodyweight",start:"—",current:"—",target:"—",pct:0}]
-    }
-  },
-
-  "rohan": {
-    password:"AdrenalinRohan!614",
-    role:"client",
-    profile:{
-      name:"Rohan", sessions:8, weeks:4, currentWeight:"78",
-      coachMessage:"Great work this week Rohan. Disc bulge is holding up well — keep listening to your body on the leg days. Focus on form over weight on goblet squats.",
-      lastSession:{title:"Session 3 — Chest, Back & Forearms",note:"Pull-ups to failure BW, S/A Pulldown 45kg, PecDec 84kg. Wrist curls added — forearm strength building well."},
-      nextSession:{title:"Session 1 — Legs",note:"Dumbbell Hip Thrusts, Glute Bridges, Leg Curls. Keep it controlled — disc protocol applies."},
-      goals:[
-        {icon:"🦴",title:"Manage Disc Bulge",desc:"Train smart around disc injury — no spinal loading, alternative movements only.",status:"active"},
-        {icon:"💪",title:"Build Strength",desc:"Progressive strength gains across all 3 sessions over a 12-week block.",status:"active"},
-        {icon:"⚖️",title:"Body Recomposition",desc:"Pescatarian + 2 vegan days per week — structured around 1,745 kcal target.",status:"active"}
-      ],
-      programme:{
-        name:"3-Day Full Body Split — Disc Protocol",
-        days:[
-          {name:"Session 1 — Legs",tag:"Glutes / Hamstrings / Quads",exercises:[
-            {name:"Dumbbell Hip Thrusts",sets:"2",reps:"15-20",rest:"90s"},
-            {name:"Glute Bridges",sets:"3",reps:"15-20",rest:"60s"},
-            {name:"Reverse Crunches",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Leg Curls S/L",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Leg Extensions",sets:"2",reps:"12",rest:"75s"},
-            {name:"Abductor Machine",sets:"2",reps:"8-10",rest:"60s"},
-            {name:"Adductor Machine",sets:"2",reps:"12-15",rest:"60s"},
-            {name:"Goblet Squats",sets:"3",reps:"12-15",rest:"75s"},
-            {name:"Calf Raises",sets:"3",reps:"12-15",rest:"60s"}
-          ]},
-          {name:"Session 2 — Shoulders, Arms & Core",tag:"Shoulders / Arms / Core",exercises:[
-            {name:"Machine Curls",sets:"2",reps:"10-12",rest:"60s"},
-            {name:"Straight Bar Curls",sets:"2",reps:"8-10",rest:"75s"},
-            {name:"Behind Head Cable Extension",sets:"2",reps:"7-10",rest:"60s"},
-            {name:"Rope Pushdowns",sets:"2",reps:"7-12",rest:"60s"},
-            {name:"Front Raises",sets:"2",reps:"10-12",rest:"60s"},
-            {name:"Cable Lateral Raises",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Dead Bugs",sets:"3",reps:"8 each",rest:"60s"},
-            {name:"Rear Delt Flys (Pec Dec)",sets:"2",reps:"15",rest:"60s"}
-          ]},
-          {name:"Session 3 — Chest, Back & Forearms",tag:"Chest / Back / Forearms",exercises:[
-            {name:"Incline Chest Press Machine",sets:"3",reps:"8-10",rest:"90s"},
-            {name:"Rope Pushdowns",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Pull Ups",sets:"2",reps:"Failure",rest:"2min"},
-            {name:"S/A Pulldown",sets:"2",reps:"10-12",rest:"75s"},
-            {name:"Straight Bar Curls",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Overhand Rows (Machine)",sets:"2",reps:"8-10",rest:"75s"},
-            {name:"Pec Dec Flys",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"Hammer Curls",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Wrist Curls",sets:"2",reps:"15",rest:"60s"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"Pescatarian — 1,745 kcal Target",
-        kcal:1745, prot:120, carb:170, fat:40,
-        notes:"Mon & Tue are vegan days. Wed–Sun pescatarian. Plant protein shake on vegan days, ESN Clear Whey on fish days.",
-        meals:[
-          {name:"Breakfast",items:["Mon/Tue: Protein Overnight Oats (Plant) — 375 kcal, 26g P","Wed/Sat: Brooklea Yoghurt Bowl — 430 kcal, 28g P","Fri/Sun: Scrambled Eggs on Toast / Overnight Oats (Whey) — 380 kcal, 30g P"],kcal:380,prot:27,carb:48,fat:8},
-          {name:"Mid Meal / Lunch",items:["Mon: Chickpea & Mixed Bean Salad — 500 kcal","Tue: Edamame & Quinoa Bowl — 490 kcal","Wed: Tuna Sandwich Light Mayo — 350 kcal","Thu: Egg Sandwich Light Mayo — 350 kcal","Fri: Tuna Sandwich Full Mayo — 430 kcal","Sat: Smoked Salmon Cream Cheese Bagel — 420 kcal","Sun: Chickpea & Mixed Bean Salad — 500 kcal"],kcal:433,prot:31,carb:43,fat:12},
-          {name:"Dinner",items:["Mon: Red Lentil Curry + Basmati Rice — 630 kcal","Tue: Black Bean Quesadilla (Vegan) — 590 kcal","Wed: Mackerel Rice & Veg — 500 kcal","Thu: Tesco Chilli Salmon + Potatoes + Veg — 705 kcal","Fri: Chickpea Tuna Pasta — 600 kcal","Sat/Sun: Herb Salmon / Egg Fried Rice + Shredded Cod — 600–705 kcal"],kcal:622,prot:41,carb:68,fat:15},
-          {name:"Snack",items:["Mon/Tue: Plant Protein Shake — 100 kcal, 22g P","Wed/Thu: ESN Clear Whey Shake — 90 kcal, 25g P","Fri: Pumpkin Seeds 25g — 145 kcal","Sat: Skyr Bowl — 200 kcal","Sun: Cottage Cheese + Rice Cakes — 200 kcal"],kcal:147,prot:22,carb:12,fat:3}
-        ]
-      },
-      sessions_history:[
-        {date:"Fri 20 Jun 2025",title:"Session 3 — Chest, Back & Forearms",notes:"Pull-ups BW to failure x2. S/A Pulldown 45kg. PecDec 84kg x3. Wrist curls 80lbs. Forearm endurance improving."},
-        {date:"Wed 18 Jun 2025",title:"Session 2 — Shoulders, Arms & Core",notes:"Machine curls 34.5kg. Straight bar curls 80lbs. Dead bugs controlled throughout. Rear delt flys 56kg x2."},
-        {date:"Mon 16 Jun 2025",title:"Session 1 — Legs",notes:"Hip thrusts 16kg x2. Leg curls 27.5–30kg. Leg ext 94kg. Goblet squats 16kg. All disc protocol cues maintained."}
-      ],
-      progress:[
-        {metric:"Bodyweight",start:"82kg",current:"78kg",target:"75kg",pct:57},
-        {metric:"Pull-Up Reps",start:"3",current:"7",target:"12",pct:50},
-        {metric:"Training Consistency",start:"0 wks",current:"4 wks",target:"12 wks",pct:33}
-      ]
-    }
-  },
-
-  "jourdan": {
-    password:"AdrenalinJourdan!382",
-    role:"client",
-    profile:{
-      name:"Jourdan", sessions:6, weeks:3, currentWeight:"—",
-      coachMessage:"You're in your follicular phase this week — best energy window of the month. Push hard on training days, carbs are working for you right now.",
-      lastSession:{title:"Session with Dylan",note:"Great output. Keep those steps at 10–12k daily — it's doing a lot of work in the background."},
-      nextSession:{title:"Training Session",note:"Follicular phase — aim for a PB this week."},
-      goals:[
-        {icon:"⚖️",title:"Fat Loss",desc:"Cycle-based nutrition protocol targeting 10–12k steps/day. Phase-specific calorie adjustments.",status:"active"},
-        {icon:"🔄",title:"Cycle-Synced Nutrition",desc:"4-phase eating plan matching hormonal cycle for best results and adherence.",status:"active"},
-        {icon:"💪",title:"Build Consistency",desc:"Follow the full 28-day cycle plan — cheat meals are planned, not reactive.",status:"active"}
-      ],
-      programme:{
-        name:"Weights + Cardio Weekly Schedule",
-        days:[
-          {name:"Day 1 — Weights Session",tag:"Full Body",exercises:[
-            {name:"Session with Dylan or solo programme",sets:"—",reps:"—",rest:"As prescribed"}
-          ]},
-          {name:"Day 2 — Cardio",tag:"Steady State / Zone 2",exercises:[
-            {name:"Steady state cardio 30–45 mins",sets:"1",reps:"30-45 min",rest:"—"}
-          ]},
-          {name:"Day 3 — Weights Session",tag:"Full Body",exercises:[
-            {name:"Solo programme or PT session",sets:"—",reps:"—",rest:"As prescribed"}
-          ]},
-          {name:"Day 4/5 — Cardio / Rest",tag:"Active Recovery",exercises:[
-            {name:"Low intensity cardio or rest",sets:"1",reps:"Optional",rest:"—"}
-          ]},
-          {name:"Day 6 — PT Session",tag:"Push The Limits",exercises:[
-            {name:"1-2-1 with Dylan",sets:"—",reps:"—",rest:"—"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"Cycle-Based Nutrition — 28 Day Plan",
-        kcal:1300, prot:105, carb:90, fat:45,
-        notes:"Phase 1 (Days 1–5): ~1,230–1,445 kcal — cheat meal Day 1. Phase 2 (Days 6–13): ~1,155–1,228 kcal — refeed Day 7. Phase 3 (Days 14–16): ~1,168–1,190 kcal — peak energy. Phase 4 (Days 17–28): ~1,350–1,495 kcal — pasta 3x/week. Keep water 3L+ daily.",
-        meals:[
-          {name:"Meal 1 — Breakfast",items:["Option A: Scrambled Eggs, Chicken Sausage & Fruit Salad — 500 kcal, 38g P","Option B: Omelette — Eggs, Chicken Sausage/Bacon & Mushrooms — 500 kcal, 42g P","Option C: Avocado Toast, Eggs & Chicken Sausage — 520 kcal, 32g P"],kcal:500,prot:37,carb:28,fat:24},
-          {name:"Snack",items:["Baby Bells x2 + Pineapple — 168–218 kcal","Greek Yoghurt Bowl — 155 kcal, 14g P","Tuna & Rice Crackers — 190 kcal, 28g P","Crackers with Cottage Cheese & Cucumber — 175 kcal, 16g P"],kcal:185,prot:18,carb:20,fat:6},
-          {name:"Meal 2 — Main",items:["Chicken Halloumi Salad with Greek Dip — 500 kcal, 44g P","Naked Chicken Burrito Bowl — 500 kcal, 45g P","Beef Mince, Rice & Salad — 510 kcal, 40g P","Salmon & Avocado Sushi Rolls — 500 kcal, 29g P","Tuna & Sweetcorn Pasta Salad — 495 kcal, 40g P (luteal only)","Chicken Arrabiata Pasta — 490 kcal, 43g P (luteal — 3x/wk)","Creamy Smoked Salmon Pasta — 505 kcal, 54g P (luteal)"],kcal:500,prot:42,carb:38,fat:16},
-          {name:"Phase Boost (Luteal Only)",items:["Cottage Cheese & Pineapple Bowl — 190 kcal, 22g P","Grenade Carb Killa Bar — 210 kcal, 20g P","Hard Boiled Eggs x2 + Cherry Tomatoes — 165 kcal, 13g P","Turkey & Light Cheese Roll-Ups — 180 kcal, 24g P"],kcal:186,prot:20,carb:16,fat:5}
-        ]
-      },
-      sessions_history:[
-        {date:"Tue 17 Jun 2025",title:"PT Session",notes:"Great energy in the follicular phase. Movement patterns sharp. Pushed on all compound movements."},
-        {date:"Sat 14 Jun 2025",title:"Weights Session",notes:"Consistent on steps this week — 10–12k daily. Good compliance on the nutrition plan."}
-      ],
-      progress:[
-        {metric:"Steps Consistency",start:"0%",current:"85%",target:"100%",pct:85},
-        {metric:"Nutrition Adherence",start:"0%",current:"80%",target:"100%",pct:80},
-        {metric:"Sessions Completed",start:"0",current:"6",target:"28",pct:21}
-      ]
-    }
-  },
-
-  "alysha": {
-    password:"AdrenalinAlysha!739",
-    role:"client",
-    profile:{
-      name:"Alysha", sessions:5, weeks:4, currentWeight:"—",
-      coachMessage:"Week 4 of the fat loss protocol. The gut optimisation changes are making a real difference — keep the lemon juice on all iron-rich meals and coffee 60 min after breakfast. Weights day today — push hard.",
-      lastSession:{title:"Weights Day — Full Body",note:"Kettlebell focus. Strong output. Keep coffee timing rule — 60 min after breakfast minimum."},
-      nextSession:{title:"Swim Day — Wednesday",note:"Protein shake post-swim. Charls Oats for breakfast. Target ~1,750 kcal."},
-      goals:[
-        {icon:"🌿",title:"100% Plant-Based",desc:"Gut-optimised vegan fat loss protocol. All meals plant-based, no animal products.",status:"active"},
-        {icon:"🏊",title:"Swim + Weights",desc:"Mon/Thu weights, Wed swim, Tue/Fri/Sat/Sun cardio/rest with 15k daily steps.",status:"active"},
-        {icon:"⚖️",title:"4-Week Fat Loss Block",desc:"2 Jun – 26 Jun. Cycle-synced calorie targets. Weights day 1,800 kcal / Swim 1,750 / Rest 1,650.",status:"active"}
-      ],
-      programme:{
-        name:"Full Body Kettlebell & Dumbbell — Sessions 1 & 2",
-        days:[
-          {name:"Session 1 — Full Body KB Focus",tag:"Lower / Hinge / Upper",exercises:[
-            {name:"Behind Head KB Squats",sets:"3",reps:"12",rest:"45s"},
-            {name:"KB Side to Side Squats",sets:"3",reps:"5 each",rest:"45s"},
-            {name:"KB Swings",sets:"3",reps:"45 secs",rest:"45s"},
-            {name:"Front Leg Deadlifts",sets:"2",reps:"12 each",rest:"60s"},
-            {name:"Good Mornings",sets:"2",reps:"12",rest:"60s"},
-            {name:"Dumbbell Deadlifts",sets:"2",reps:"12",rest:"60s"},
-            {name:"Press Ups",sets:"2",reps:"10",rest:"60s"},
-            {name:"Chest Flys → Chest Press",sets:"2",reps:"12",rest:"60s"},
-            {name:"Bicep Curls",sets:"2",reps:"12",rest:"60s"}
-          ]},
-          {name:"Session 2 — Full Body DB & KB",tag:"Shoulder / Back / Lower / Core",exercises:[
-            {name:"Side Raises",sets:"3",reps:"15",rest:"60s"},
-            {name:"Front Raise → Overhead Press",sets:"3",reps:"15",rest:"60s"},
-            {name:"KB Upright Rows",sets:"3",reps:"12",rest:"60s"},
-            {name:"Behind Head Tricep Extension",sets:"3",reps:"12",rest:"60s"},
-            {name:"Single Arm Bent Row",sets:"3",reps:"12",rest:"60s"},
-            {name:"Bent Wide KB Rows",sets:"3",reps:"12",rest:"60s"},
-            {name:"Sumo Squats DB",sets:"2",reps:"15",rest:"60s"},
-            {name:"Behind Head Lunges KB",sets:"2",reps:"10 each",rest:"60s"},
-            {name:"Dead Bugs",sets:"2",reps:"10 each",rest:"45s"},
-            {name:"Plank",sets:"2",reps:"1:20+ min",rest:"45s"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"4-Week Fat Loss — Gut Optimised Protocol",
-        kcal:1750, prot:110, carb:210, fat:48,
-        notes:"Coffee 60 min MINIMUM after breakfast. Lemon juice on ALL iron-rich meals — non-optional. 250ml warm water + lemon 20 min before lunch & dinner. Rice replaces quinoa (lower FODMAP). Lentils halved, extra tofu added. Max 3x tempeh/week. Chia reduced to 4g. Ginger in morning oats daily.",
-        meals:[
-          {name:"Breakfast",items:["Weights/Swim Day: Charls Oats + Plain Protein (530 kcal, 39g P) — 40g oats / oat milk / banana / soy yoghurt / raspberries / blueberries / strawberries / ½ tsp PB / maple / cinnamon / ½ tsp ginger / 4g chia / 1 scoop vegan protein","Rest Day: Porridge Oats + Plain Protein (385 kcal, 30g P) — 30g oats / oat milk / 8g chia / banana / agave / berries / 1 scoop vegan protein"],kcal:460,prot:35,carb:57,fat:12},
-          {name:"Lunch / Main Meal",items:["Jacket Spud + Tofu Topping (415 kcal, 22g P) — GUT-FRIENDLY DEFAULT","Hot Honey Tofu Bowl (430 kcal, 26g P) — jasmine rice + lentils + tofu — lemon dressing non-optional","Tempeh Wrap (500 kcal, 30g P) — max 3x/week","Oriental Stir Fry (554 kcal, 33g P) — preferred rest day option"],kcal:475,prot:28,carb:55,fat:15},
-          {name:"Dinner / Second Meal",items:["Same options as lunch — rotate to avoid repeating same meal twice","Jacket Spud + Tofu Topping is the gut-friendly default for both meals"],kcal:475,prot:28,carb:55,fat:15},
-          {name:"Snack",items:["Banana + Peanut Butter (195 kcal, 5g P) — post-cardio or mid-afternoon"],kcal:195,prot:5,carb:32,fat:7},
-          {name:"Protein Shake (Weights + Swim ONLY)",items:["Vegan Chocolate Protein Shake (128 kcal, 25g P) — Mon/Wed/Thu ONLY","32g vegan chocolate protein + 300ml cold water — NOT on cardio/rest days"],kcal:128,prot:25,carb:8,fat:4}
-        ]
-      },
-      sessions_history:[
-        {date:"Mon 23 Jun 2025",title:"Weights — Session 1 (KB Focus)",notes:"Strong session. All 3 circuits completed. KB swings form solid. Chest work progressed. Coffee timing maintained."},
-        {date:"Wed 18 Jun 2025",title:"Swim Day",notes:"Post-swim shake taken within 30 min. Charls oats for breakfast. Good energy throughout."},
-        {date:"Mon 16 Jun 2025",title:"Weights — Session 2 (DB & KB)",notes:"All 4 parts completed. Plank held 1:35. Lateral raises controlled. Dead bugs form excellent."}
-      ],
-      progress:[
-        {metric:"Protocol Adherence",start:"0%",current:"88%",target:"100%",pct:88},
-        {metric:"Weekly Sessions",start:"0",current:"5",target:"8",pct:63},
-        {metric:"Daily Steps",start:"0",current:"15k",target:"15k",pct:100}
-      ]
-    }
-  },
-
-  "jon": {
-    password:"AdrenalinJon!456",
-    role:"client",
-    profile:{
-      name:"Jon", sessions:7, weeks:7, currentWeight:"—",
-      coachMessage:"Phase 3 Jon — the final push. Progressive overload ramps up this week. Stay disciplined, this is where results become visible.",
-      lastSession:{title:"Session C — Shoulders & Arms",note:"Good intensity. Keep logging every set — that data is your programming tool going forward."},
-      nextSession:{title:"Session A — Chest & Back",note:"Phase 3 final push. Aim to beat last session weights. No ego — perfect form first."},
-      goals:[
-        {icon:"🎯",title:"Get Lean",desc:"8-week lean phase programme — fat loss while maintaining muscle.",status:"active"},
-        {icon:"📚",title:"Learn to Self-Programme",desc:"By end of Phase 3 you'll understand progressive overload, rep ranges, and how to programme yourself.",status:"active"},
-        {icon:"✅",title:"Complete 8-Week Block",desc:"Phase 1 Breaking In / Phase 2 Your Own Time / Phase 3 Final Push",status:"active"}
-      ],
-      programme:{
-        name:"8-Week Lean Phase — Chest/Back / Lower / Shoulders & Arms",
-        days:[
-          {name:"Session A — Chest & Back",tag:"Push & Pull Upper",exercises:[
-            {name:"Chest Press",sets:"3",reps:"8-12",rest:"90s"},
-            {name:"Incline Chest Press",sets:"3",reps:"8-12",rest:"90s"},
-            {name:"Lat Pulldown",sets:"3",reps:"8-12",rest:"90s"},
-            {name:"Cable Row",sets:"3",reps:"8-12",rest:"90s"},
-            {name:"Cable Flys",sets:"3",reps:"10-12",rest:"60s"}
-          ]},
-          {name:"Session B — Lower Body",tag:"Quads / Hamstrings / Glutes",exercises:[
-            {name:"Leg Press",sets:"3",reps:"8-12",rest:"2min"},
-            {name:"Leg Extension",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Lying Leg Curl",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"Hip Thrust",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Calf Raise",sets:"3",reps:"15-20",rest:"60s"}
-          ]},
-          {name:"Session C — Shoulders & Arms",tag:"Delts / Biceps / Triceps",exercises:[
-            {name:"Shoulder Press",sets:"3",reps:"8-12",rest:"90s"},
-            {name:"Lateral Raises",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Cable Lateral Raise",sets:"2",reps:"15",rest:"60s"},
-            {name:"Bicep Curls",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Hammer Curls",sets:"2",reps:"12",rest:"60s"},
-            {name:"Tricep Pushdown",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Overhead Tricep Extension",sets:"2",reps:"12",rest:"60s"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"Lean Phase — No Peppers — Budget Friendly",
-        kcal:1900, prot:150, carb:200, fat:50,
-        notes:"Early shift: pack lunch the night before. Late shift: more time for breakfast. Batch prep Sunday — chicken 1kg, mince 500g, rice, salad base, overnight oats x3. Wednesday evening mini top-up prep.",
-        meals:[
-          {name:"Early Shift Breakfast",items:["Overnight Oats + Almond Butter — 420 kcal, 32g P"],kcal:420,prot:32,carb:52,fat:10},
-          {name:"Late Shift Breakfast",items:["Greek Yoghurt Bowl + Granola + Fruit — 410 kcal, 32g P","Eggs on Toast (2-3 eggs + mushrooms) — 440 kcal, 28g P"],kcal:425,prot:30,carb:41,fat:14},
-          {name:"Lunch",items:["Chicken Rice Box + Pre-Made Salad — 490 kcal, 44g P","Tuna Sandwich + Apple or Orange — 440 kcal, 40g P","Chicken Pitta + Salad + Fruit — 480 kcal, 42g P","Beef Rice Box + Salad — 490 kcal, 44g P","Chicken Wrap + Salad + Fruit — 480 kcal, 42g P"],kcal:476,prot:42,carb:53,fat:9},
-          {name:"Dinner",items:["Beef Mince & Pasta with Passata — 660 kcal, 52g P","Chicken or Beef Curry + Rice — 680 kcal, 52g P","Chicken or Beef + Cauliflower Rice — 540 kcal, 52g P","Chicken or Fish + Potatoes + Veg — 680 kcal, 52g P","Beef/Chicken Pasta OR Eat Out — 660 kcal"],kcal:644,prot:52,carb:70,fat:17},
-          {name:"Snack",items:["Flavoured Rice Cakes + Tuna Tin — 220 kcal, 27g P","Greek Yoghurt + Sugar-Free Jelly — 180 kcal, 18g P","Greek Yoghurt Bowl — 380 kcal, 28g P"],kcal:260,prot:24,carb:27,fat:4}
-        ]
-      },
-      sessions_history:[
-        {date:"Mon 23 Jun 2025",title:"Session C — Shoulders & Arms",notes:"Phase 3 energy high. Shoulder press PB. Lateral raises controlled. Triceps getting stronger week on week."},
-        {date:"Thu 19 Jun 2025",title:"Session B — Lower Body",notes:"Leg press up 10kg. Hip thrusts solid form. Calves progressed 2 extra reps."},
-        {date:"Mon 16 Jun 2025",title:"Session A — Chest & Back",notes:"Lat pulldown up 5kg. Cable rows strong. Chest press form improving every session."}
-      ],
-      progress:[
-        {metric:"Weeks Completed",start:"0",current:"7",target:"8",pct:88},
-        {metric:"Sessions Logged",start:"0",current:"7",target:"24",pct:29},
-        {metric:"Progressive Overload",start:"Week 1",current:"Week 7",target:"Week 8",pct:88}
-      ]
-    }
-  },
-
-  "mattb": {
-    password:"AdrenalinMattB!918",
-    role:"client",
-    profile:{
-      name:"MattB", sessions:4, weeks:2, currentWeight:"79",
-      coachMessage:"Body recomp is working MattB. Creatine 5g daily non-negotiable — take it with any meal. Keep carbs front-loaded around training. Protein target: 160g minimum every day.",
-      lastSession:{title:"Training Session",note:"Good output. Zone 2 cardio 15-20 min post session — don't skip this."},
-      nextSession:{title:"Push Session",note:"Incline Barbell Press, Cable Fly, Overhead Press, Lateral Raises, Tricep work."},
-      goals:[
-        {icon:"💪",title:"Upper Body Hypertrophy",desc:"Build upper body mass — target 10-12% body fat with visible muscle development.",status:"active"},
-        {icon:"🔄",title:"Body Recomposition",desc:"87kg → 14% body fat over 10–12 weeks. 2,000 kcal/day, 160g protein.",status:"active"},
-        {icon:"💊",title:"Creatine Daily",desc:"5g creatine every day without fail — mix into any drink or post-training shake.",status:"active"}
-      ],
-      programme:{
-        name:"4-Day Push / Pull / Legs / Upper Hypertrophy",
-        days:[
-          {name:"Session A — Push",tag:"Chest / Shoulders / Triceps",exercises:[
-            {name:"Incline Barbell Bench Press",sets:"3",reps:"8-10",rest:"2min"},
-            {name:"High to Low Cable Fly",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Overhead Press",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Lateral Raises",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Rope Tricep Extension",sets:"3",reps:"7-9",rest:"75s"},
-            {name:"Chest Press Machine",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Straight Bar Tricep Extension",sets:"2",reps:"8-10",rest:"60s"}
-          ]},
-          {name:"Session B — Pull",tag:"Back / Biceps / Rear Delts",exercises:[
-            {name:"Lat Pulldown Wide Grip",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Seated Cable Row Close Grip",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Single Arm DB Row",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"Cable Pullover",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Face Pull Rope",sets:"3",reps:"15-20",rest:"60s"},
-            {name:"Dumbbell Bicep Curl",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Hammer Curl",sets:"3",reps:"12-15",rest:"60s"}
-          ]},
-          {name:"Session C — Legs",tag:"Quads / Hamstrings / Glutes",exercises:[
-            {name:"Barbell Back Squat",sets:"3",reps:"8-10",rest:"2.5min"},
-            {name:"Leg Press",sets:"3",reps:"10-12",rest:"2min"},
-            {name:"Leg Extension",sets:"3",reps:"12-15",rest:"75s"},
-            {name:"Lying Hamstring Curl",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"Romanian Deadlift",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Seated Calf Raise",sets:"3",reps:"15-20",rest:"60s"}
-          ]},
-          {name:"Session D — Upper Hypertrophy",tag:"Shoulders / Arms",exercises:[
-            {name:"Seated DB Shoulder Press",sets:"3",reps:"9-12",rest:"90s"},
-            {name:"Cable Lateral Raise S/A",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Reverse Pec Dec",sets:"3",reps:"15-20",rest:"60s"},
-            {name:"Close Grip Bench / Dips",sets:"3",reps:"8-10",rest:"90s"},
-            {name:"DB Skullcrusher",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"EZ Bar Curl",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"Incline DB Curl",sets:"3",reps:"12-15",rest:"60s"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"Body Recomp — 2,000 kcal / 160g Protein",
-        kcal:2000, prot:160, carb:228, fat:50,
-        notes:"Phase 1 (Wks 1-4): 3,100 kcal lean bulk. Phase 2 (Wks 5-8): 3,200 kcal build. Phase 3 (Wks 9-10): 3,000 kcal maintenance. Phase 4 (Wks 11+): 3,200–3,400 kcal continued bulk. Creatine 5g daily. Front-load carbs around training. Alcohol max 1–5 units/week. 3–4L water daily. Zone 2 cardio 15–20 min post every session.",
-        meals:[
-          {name:"Breakfast (Training Day)",items:["Option A: Egg White Oats & Fruit — 500 kcal, 40g P (60g oats / 200ml milk / 1 scoop whey / 3 egg whites / banana / cinnamon)","Option B: Steak & Egg White Scramble — 495 kcal, 42g P (150g sirloin / 4 egg whites + 1 whole egg / 2 slices wholegrain / mushrooms & spinach)"],kcal:498,prot:41,carb:50,fat:13},
-          {name:"Pre-Training Lunch",items:["Option A: Chicken Rice Bowl — 520 kcal, 42g P (180g chicken / 200g rice / 80g kidney beans / salad / hot sauce)","Option B: Turkey Mince & Rice — 515 kcal, 43g P (200g turkey mince / 200g basmati / capsicum & onion / cumin & paprika)"],kcal:518,prot:43,carb:71,fat:8},
-          {name:"Post-Training Snack",items:["Option A: Protein Shake + Carb Top-Up — 380 kcal, 38g P (2 scoops whey / banana / 3 rice cakes / 5g creatine)","Option B: Greek Yoghurt Protein Bowl — 375 kcal, 36g P (200g 0% Greek yoghurt / 1 scoop whey / berries / 30g oats / 5g creatine)"],kcal:378,prot:37,carb:48,fat:6},
-          {name:"Dinner",items:["Option A: Salmon, Baby Potatoes & Greens — 535 kcal, 40g P (200g salmon / 200g baby potatoes / 150g broccoli & beans)","Option B: Lean Beef Mince & Sweet Potato — 530 kcal, 40g P (200g beef mince 5% / 200g sweet potato / steamed greens)"],kcal:533,prot:40,carb:44,fat:19},
-          {name:"REST DAY — Breakfast",items:["Option A: Full High Protein Breakfast — 490 kcal, 42g P (4 eggs / 150g back bacon / 2 slices wholegrain / mushrooms)","Option B: Protein Pancakes — 480 kcal, 40g P (60g oats blended / 3 egg whites + 1 whole egg / milk / whey / banana)"],kcal:485,prot:41,carb:43,fat:14}
-        ]
-      },
-      sessions_history:[
-        {date:"Mon 23 Jun 2025",title:"Session A — Push",notes:"Incline bench 50kg x8. Cable flys feeling good. Overhead press progressing. Zone 2 done post session."},
-        {date:"Thu 19 Jun 2025",title:"Session C — Legs",notes:"Squat form improving. Leg press progressed. RDL hamstring connection getting better. 15 min Zone 2 after."}
-      ],
-      progress:[
-        {metric:"Bodyweight",start:"87kg",current:"79kg",target:"—",pct:0},
-        {metric:"Body Fat Target",start:"~15%",current:"~13%",target:"14%",pct:50},
-        {metric:"Sessions",start:"0",current:"4",target:"48",pct:8}
-      ]
-    }
-  },
-
-  "matt": {
-    password:"AdrenalinMatt!627",
-    role:"client",
-    profile:{
-      name:"Matt", sessions:16, weeks:8, currentWeight:"91",
-      coachMessage:"Phase 2 Matt — slight calorie increase to 2,700 kcal this week. Muscle preservation is the priority now. Protein 195–210g every day without fail.",
-      lastSession:{title:"Session A — Lower Body",note:"Leg ext 91kg. Hamstring curl 91kg with 3s hold. Leg press 180kg. Strong session — progressive overload working."},
-      nextSession:{title:"Session B — Push",note:"PecDec 85-90kg, Incline DB 37.5kg, Overhead Press 27.5kg. Beat last session on every movement."},
-      goals:[
-        {icon:"⚖️",title:"Reach 88kg",desc:"Current: ~91kg. Active cut phase — 2,500 kcal with 195–210g protein daily. Visible abs target.",status:"active"},
-        {icon:"💪",title:"Preserve Muscle",desc:"Fat loss with muscle maintenance — high protein, structured training, 25 min cardio post-session.",status:"active"},
-        {icon:"📉",title:"Fat Loss Phase",desc:"Phase 1 (Wks 1-6): 2,500 kcal. Phase 2 (Wks 7-10): 2,700 kcal. Phase 3 (Wks 11-12): 3,000 kcal refeed.",status:"active"}
-      ],
-      programme:{
-        name:"V4 — Lower / Push / Pull+Hams — 3 Days/Week",
-        days:[
-          {name:"Session A — Lower Body",tag:"Quads / Hamstrings / Calves",exercises:[
-            {name:"Leg Extension",sets:"3",reps:"10 each",rest:"90s"},
-            {name:"Lying Hamstring Curl",sets:"3",reps:"12/10-12/10",rest:"90s"},
-            {name:"Leg Press",sets:"2",reps:"8-10",rest:"2.5min"},
-            {name:"Calf Raise on Leg Press",sets:"4",reps:"12-20",rest:"60s"}
-          ]},
-          {name:"Session B — Push",tag:"Chest / Shoulders / Arms",exercises:[
-            {name:"Machine Pec Dec Fly",sets:"3",reps:"12/7-9/Failure",rest:"90s"},
-            {name:"Incline DB Press",sets:"2",reps:"8-10",rest:"2min"},
-            {name:"DB Overhead Press",sets:"2",reps:"8-10",rest:"90s"},
-            {name:"Seated DB Lateral Raise",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Bicep Curl Dumbbell",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Tricep Extension Straight Bar",sets:"2",reps:"8-10",rest:"75s"},
-            {name:"Tricep Extension Rope",sets:"2",reps:"7-15",rest:"75s"}
-          ]},
-          {name:"Session C — Pull + Hams",tag:"Back / Rear Delts / Biceps",exercises:[
-            {name:"Seated Cable Row",sets:"3",reps:"6-10",rest:"2min"},
-            {name:"Reverse Pec Dec",sets:"3",reps:"12-15",rest:"75s"},
-            {name:"Diverging Lat Pulldown",sets:"3",reps:"7-12",rest:"90s"},
-            {name:"S/A Preacher Curl",sets:"3",reps:"7-10",rest:"75s"},
-            {name:"Hammer Curls",sets:"3",reps:"10-12",rest:"60s"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"Deficit Phase — 2,000–2,200 kcal",
-        kcal:2000, prot:168, carb:260, fat:52,
-        notes:"Rest Day: 2,000 kcal / 168g P / 260g C / 52g F. Training Day: 2,200 kcal / 178g P / 272g C / 48g F. Carbs front-loaded around training — 60% in meals 2, 3 & 5. Supplements: morning (Vit D3K2, Omega 3, Multivitamin, Fenugreek, Ashwagandha) / pre-workout (Creatine 5g) / post-workout (Whey) / evening (Magnesium). 8-day rotating meal plan available.",
-        meals:[
-          {name:"Breakfast",items:["Option A: Protein Porridge Bowl — 500 kcal, 38g P (45g oats / 150ml milk / 1 scoop whey / banana / 5g PB)","Option B: Egg & Cheese Scramble on Toast — 561 kcal, 38g P (3 eggs / 2 wholegrain slices / cheese / mushrooms / spinach)","Training Day Option A: Protein Porridge Bowl (smaller) — 422 kcal, 36g P"],kcal:494,prot:37,carb:55,fat:15},
-          {name:"Lunch",items:["Option A: Chicken & Rice Bowl — 532 kcal, 55g P (180g chicken / 48g rice dry / mixed beans / broccoli)","Option B: Chicken Pasta Bowl — 539 kcal, 56g P (175g chicken / 46g pasta / cheese / mushrooms / spinach)"],kcal:536,prot:56,carb:51,fat:11},
-          {name:"Dinner",items:["Option A: Beef Mince & Rice — 495 kcal, 45g P (140g mince / 46g rice / onion & mushrooms / broccoli)","Option B: Chicken Bean & Rice Stew — 464 kcal, 48g P (140g chicken / 100g mixed beans / rice / spinach)"],kcal:480,prot:47,carb:53,fat:9},
-          {name:"Supper / Evening",items:["Option A: Yoghurt & Whey Protein Bowl — 444 kcal, 37g P (230g yoghurt / 1 scoop whey / banana / 20g oats)","Option B: Oat & Milk Protein Bowl — 505 kcal, 39g P (48g oats / 200ml milk / 1 scoop whey / banana)"],kcal:475,prot:38,carb:62,fat:10},
-          {name:"Training Day Pre-Workout (Meal 2)",items:["Banana & Oat Shake — 321 kcal, 18g P (40g oats / banana / ½ scoop whey / 200ml water — 60-90 min before)","Rice Cake & PB Stack — 368 kcal, 8g P (4 rice cakes / 10g PB / banana / 100g yoghurt)"],kcal:345,prot:13,carb:60,fat:6}
-        ]
-      },
-      sessions_history:[
-        {date:"Wed 25 Jun 2025",title:"Session B — Push",notes:"PecDec 85/90/80kg. Incline DB 37.5kg x9. Overhead press 27.5kg S1, 22.5kg S2 with 5s eccentric. Laterals 7.5kg x15."},
-        {date:"Mon 23 Jun 2025",title:"Session A — Lower",notes:"Leg ext 91kg x10 x3. Ham curl 91kg — 3s hold, 5s negative. Leg press 180kg. Calves full stretch throughout."},
-        {date:"Thu 19 Jun 2025",title:"Session C — Pull + Hams",notes:"Cable row 90kg. Reverse pec dec 64kg. Lat pulldown 109kg, dropset. Preacher curl 15kg. Hammer curls 25kg."},
-        {date:"Mon 16 Jun 2025",title:"Session A — Lower",notes:"First session at V4 weights. Everything up from V3. Ham curl 3s contraction cue clicking into place."}
-      ],
-      progress:[
-        {metric:"Bodyweight",start:"94.9kg",current:"91kg",target:"88kg",pct:57},
-        {metric:"Leg Extension",start:"80kg",current:"91kg",target:"100kg",pct:55},
-        {metric:"Hamstring Curl",start:"75kg",current:"91kg",target:"100kg",pct:64},
-        {metric:"Leg Press",start:"140kg",current:"180kg",target:"200kg",pct:67}
-      ]
-    }
-  },
-
-  "sam": {
-    password:"AdrenalinSam!203",
-    role:"client",
-    profile:{
-      name:"Sam", sessions:0, weeks:0, currentWeight:"—",
-      coachMessage:"Welcome Sam — your programme is being built. Everything will be loaded here before your first session.",
-      lastSession:{title:"Not started",note:"Session notes will appear here."},
-      nextSession:{title:"Session 1 — Onboarding",note:"Programme walkthrough and movement screening."},
-      goals:[{icon:"🎯",title:"Goal",desc:"To be confirmed at onboarding.",status:"active"}],
-      programme:{name:"To be loaded",days:[]},
-      nutrition:{phase:"Setup Phase",kcal:2000,prot:160,carb:200,fat:50,notes:"Personalised targets coming after onboarding.",meals:[]},
-      sessions_history:[],
-      progress:[{metric:"Bodyweight",start:"—",current:"—",target:"—",pct:0}]
-    }
-  },
-
-  "theresa": {
-    password:"AdrenalinTheresa!847",
-    role:"client",
-    profile:{
-      name:"Theresa", sessions:10, weeks:5, currentWeight:"—",
-      coachMessage:"Brilliant progress Theresa. Protein priority every meal — aim for at least 30g per meal. The meal plan gives you full flexibility. Mix and match freely as long as calories are close.",
-      lastSession:{title:"PT Session",note:"Good work. Keep hitting that protein target and the results will come."},
-      nextSession:{title:"PT Session",note:"Progression not perfection — let's go."},
-      goals:[
-        {icon:"⚖️",title:"Fat Loss",desc:"High protein, flexible meal plan. Mix and match from the menu as long as calories match.",status:"active"},
-        {icon:"🍗",title:"Protein Priority",desc:"Aim for at least 30g protein per meal. Protein is the non-negotiable.",status:"active"},
-        {icon:"📅",title:"Sustainable Habits",desc:"7-day example structure with full flexibility. No strict rules — just smart choices.",status:"active"}
-      ],
-      programme:{
-        name:"2x PT Sessions per Week + Independent Training",
-        days:[
-          {name:"Day 1 — Weight Training",tag:"Session with Dylan",exercises:[{name:"1-2-1 PT Session",sets:"—",reps:"—",rest:"As coached"}]},
-          {name:"Day 2 — Cardio",tag:"Steady State",exercises:[{name:"Steady state cardio 30-45 min",sets:"1",reps:"30-45 min",rest:"—"}]},
-          {name:"Day 3 — Weight Training",tag:"Session with Dylan",exercises:[{name:"1-2-1 PT Session",sets:"—",reps:"—",rest:"As coached"}]},
-          {name:"Day 4/5/6 — Cardio / Rest",tag:"Active Recovery",exercises:[{name:"Walk, swim, or light cardio",sets:"1",reps:"Optional",rest:"—"}]}
-        ]
-      },
-      nutrition:{
-        phase:"Protein Priority — Flexible Meal Plan",
-        kcal:1700, prot:130, carb:150, fat:45,
-        notes:"Mix and match from the meal library freely — swap same-calorie meals. Meal 1 (≤300 kcal), Meal 2 (~500 kcal), Meal 3 (~500 kcal). Day 6 (eating out): enjoy it — manage the rest of the day accordingly.",
-        meals:[
-          {name:"Meal 1 — Low Kcal (≤300 kcal)",items:["Müller Protein Drink — 185 kcal, 25g P","Surreal Cereal + milk — 200 kcal, 18g P","Brooklea Protein Yoghurt w/ Cereal Balls — 230 kcal, 30g P","Greek Yoghurt Pot — 260 kcal, 22g P (200g 0% yoghurt / berries / honey)","Protein Shake + Banana/Cereal Bar — 280 kcal, 24g P"],kcal:231,prot:24,carb:22,fat:5},
-          {name:"Meal 2 — ~500 kcal",items:["Chicken Sandwich — 500 kcal, 45g P","Chicken Wrap with Fruit — 500 kcal, 40g P","Chicken Mediterranean Bowl — 500 kcal, 49g P","Chicken Pasta Salad — 500 kcal, 43g P","Egg & Bacon Omelette — 500 kcal, 35g P","Eggs on Sourdough — 500 kcal, 30g P","Protein Oats — 500 kcal, 35g P"],kcal:500,prot:40,carb:52,fat:12},
-          {name:"Meal 3 — ~500 kcal",items:["Chicken, Rice & Veggies — 500 kcal, 45g P","Chicken Fajitas — 500 kcal, 42g P","Beef Spag Bol — 500 kcal, 35g P","Cod Fillet w/ Mash & Veg — 500 kcal, 42g P","Chicken Curry + Potatoes — 486 kcal, 53g P","Beef Mince, Egg Fried Rice & Salad — 500 kcal, 35g P","Chicken Arrabiata Pasta — 490 kcal, 43g P"],kcal:497,prot:42,carb:52,fat:10}
-        ]
-      },
-      sessions_history:[
-        {date:"Mon 23 Jun 2025",title:"PT Session",notes:"Strong session. Protein hitting targets this week. Keep the momentum."},
-        {date:"Thu 19 Jun 2025",title:"PT Session",notes:"Good work on all movements. Form improving week on week."},
-        {date:"Mon 16 Jun 2025",title:"PT Session",notes:"Consistency is building. Nutrition on track — protein priority paying off."}
-      ],
-      progress:[
-        {metric:"Sessions Completed",start:"0",current:"10",target:"24",pct:42},
-        {metric:"Nutrition Adherence",start:"0%",current:"75%",target:"100%",pct:75},
-        {metric:"Training Weeks",start:"0",current:"5",target:"12",pct:42}
-      ]
-    }
-  },
-  "ben": {
-    password:"AdrenalinBen!502",
-    role:"client",
-    profile:{
-      name:"Ben", sessions:0, weeks:0, currentWeight:"79",
-      coachMessage:"Welcome Ben — Phase 1 Lean Bulk starts now. Hit your protein every day, get your steps in, and trust the process. 4 sessions a week — Push, Pull, Legs, Upper Hypertrophy. Let's build.",
-      lastSession:{title:"Not started",note:"First session notes will appear here."},
-      nextSession:{title:"Session A — Push",note:"Chest, Shoulders, Triceps. Incline Barbell Bench Press to start."},
-      goals:[
-        {icon:"💪",title:"Upper Body Mass",desc:"Primary goal — hypertrophy focus on chest, shoulders, back and arms over a 12 week block.",status:"active"},
-        {icon:"🫁",title:"Conditioning & Recovery",desc:"Secondary goal — 15-20 min Zone 2 cardio after every session, improve sleep to 7-8 hrs.",status:"active"},
-        {icon:"📈",title:"Controlled Lean Bulk",desc:"+0.3-0.5kg per week target. Phase-based calorie periodisation over 12+ weeks.",status:"active"}
-      ],
-      programme:{
-        name:"4-Day Push / Pull / Legs / Upper Hypertrophy Split",
-        days:[
-          {name:"Session A — Push",tag:"Chest / Shoulders / Triceps",exercises:[
-            {name:"Incline Barbell Bench Press",sets:"3",reps:"8-10",rest:"90s"},
-            {name:"High to Low Cable Fly",sets:"2",reps:"10-12",rest:"60s"},
-            {name:"Overhead Press",sets:"2",reps:"10-12",rest:"90s"},
-            {name:"Lateral Raises",sets:"3",reps:"12-15",rest:"45s"},
-            {name:"Rope Tricep Extension",sets:"3",reps:"7-9",rest:"60s"},
-            {name:"Chest Press Machine",sets:"2",reps:"10-12",rest:"60s"},
-            {name:"Straight Bar Tricep Extension",sets:"3",reps:"8-10",rest:"60s"},
-            {name:"Post-Session Cardio",sets:"1",reps:"15-20 min Zone 2",rest:"—"}
-          ]},
-          {name:"Session B — Pull",tag:"Back / Biceps",exercises:[
-            {name:"Lat Pulldown — Wide Grip",sets:"2",reps:"10-12",rest:"90s"},
-            {name:"Seated Cable Row — Close Grip",sets:"3",reps:"10-12",rest:"75s"},
-            {name:"Single Arm DB Row",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Cable Pullover",sets:"2",reps:"12-15",rest:"60s"},
-            {name:"Face Pull — Rope",sets:"3",reps:"15-20",rest:"45s"},
-            {name:"Dumbbell Bicep Curl",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Hammer Curl",sets:"3",reps:"12-15",rest:"45s"},
-            {name:"Post-Session Cardio",sets:"1",reps:"15-20 min Zone 2",rest:"—"}
-          ]},
-          {name:"Session C — Legs",tag:"Quads / Hamstrings / Glutes",exercises:[
-            {name:"Lying Hamstring Curl",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Leg Press",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Leg Extension",sets:"3",reps:"12-15",rest:"60s"},
-            {name:"Romanian Deadlift",sets:"3",reps:"10-12",rest:"90s"},
-            {name:"Adductor Machine",sets:"2",reps:"12-15",rest:"45s"},
-            {name:"Seated Calf Raise",sets:"3",reps:"15-20",rest:"45s"},
-            {name:"Post-Session Cardio",sets:"1",reps:"15-20 min Zone 2",rest:"—"}
-          ]},
-          {name:"Session D — Upper Hypertrophy",tag:"Shoulders / Arms",exercises:[
-            {name:"Seated DB/Machine Shoulder Press",sets:"3",reps:"9",rest:"90s"},
-            {name:"Cable Lateral Raise — Single Arm",sets:"3",reps:"10-12",rest:"45s"},
-            {name:"Reverse Pec Dec / Rear Delt Fly",sets:"3",reps:"15-20",rest:"45s"},
-            {name:"Close Grip Bench / Dips",sets:"3",reps:"8-10",rest:"75s"},
-            {name:"DB Skullcrusher",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"EZ Bar / Cable Curl",sets:"3",reps:"10-12",rest:"60s"},
-            {name:"Incline DB Curl",sets:"3",reps:"12-15",rest:"45s"},
-            {name:"Post-Session Cardio",sets:"1",reps:"15-20 min Zone 2",rest:"—"}
-          ]}
-        ]
-      },
-      nutrition:{
-        phase:"Phase 1 — Lean Bulk (Weeks 1-4)",
-        kcal:3100, prot:175, carb:375, fat:85,
-        notes:"Controlled surplus, protein priority. Phase 1: 3,100 kcal / 170-180g P / 370-380g C / 80-90g F. Phase 2 (Wk 5-8): 3,200 kcal. Phase 3 (Wk 9-10, deload): 3,000 kcal. Phase 4 (Wk 11+): 3,200-3,400 kcal — reviewed on results. Creatine 5g daily, non-negotiable. Target 10,000 steps/day. Sleep 7-8 hrs minimum — recovery priority.",
-        meals:[
-          {name:"Meal 1 — Breakfast (Oats + Yoghurt Bowl)",items:["70g Rolled Oats + 15g Whey + 200g 0% Greek Yoghurt + 50g Raspberries + 50g Blueberries + 5g Honey — 507 kcal, 42g P, 69g C, 7g F","Protein Oats — banana, whey, milk, cinnamon","Steak & Egg White Scramble — sirloin, eggs, wholegrain toast, mushroom & spinach"],kcal:500,prot:41,carb:60,fat:11},
-          {name:"Meal 2 — Pre-Training Lunch",items:["Chicken Rice Bowl — 180g chicken, 200g rice, kidney beans, salad — 520 kcal, 42g P","Turkey Mince & Rice — 200g turkey mince, 200g basmati rice, peppers — 515 kcal, 43g P","Chicken Thighs, Potatoes & Veggies (meal prep x3) — ~619 kcal, ~36g P, ~56g C, ~28g F"],kcal:520,prot:42,carb:70,fat:10},
-          {name:"Meal 3 — Post-Training Snack",items:["2 Scoops Whey + Banana + 3 Rice Cakes + Creatine — 380 kcal, 38g P","Greek Yoghurt Protein Bowl — yoghurt, whey, berries, oats — 375 kcal, 36g P"],kcal:378,prot:37,carb:48,fat:6},
-          {name:"Meal 4 — Dinner",items:["Salmon, Baby Potatoes & Greens — 535 kcal, 40g P, 45g C, 18g F","Lean Beef Mince & Sweet Potato — 530 kcal, 40g P, 42g C, 20g F","Beef Steak & Potato (rest day) — 650 kcal, 52g P"],kcal:540,prot:44,carb:44,fat:19}
-        ]
-      },
-      sessions_history:[],
-      progress:[
-        {metric:"Sessions Completed",start:"0",current:"0",target:"48",pct:0},
-        {metric:"Phase 1 Progress",start:"Wk 0",current:"Wk 0",target:"Wk 4",pct:0},
-        {metric:"Daily Steps Avg",start:"0",current:"0",target:"10000",pct:0}
-      ]
-    }
-  }
-};
+let USERS = {}; // populated at runtime via /api/login, /api/me, /api/clients — never shipped hardcoded
 
 // Food logs stored per user per day
 const FOOD_LOGS = {};
@@ -1566,8 +989,36 @@ let currentUser = null;
 // All data shared across devices in real time
 // ═══════════════════════════════════════════
 
-var KV_WORKER_URL = 'https://adrenalin-kv.6b94jjw44v.workers.dev';
-var KV_AUTH_TOKEN = 'AdrenalinKV!2026';
+// Same-origin API — served by the same Worker as the app itself (see worker.js).
+// No shared secret lives here: every request carries the per-login session
+// token issued by /api/login, and the server enforces that a client session
+// can only touch its own data (see canAccessKey in worker.js).
+var SESSION_TOKEN = null;
+
+function authHeaders(extra) {
+  var h = SESSION_TOKEN ? { 'Authorization': 'Bearer ' + SESSION_TOKEN } : {};
+  return extra ? Object.assign(h, extra) : h;
+}
+
+function getStoredToken() { try { return localStorage.getItem('adrenalin:session_token'); } catch(e) { return null; } }
+function setStoredToken(t) {
+  try {
+    if (t) localStorage.setItem('adrenalin:session_token', t);
+    else localStorage.removeItem('adrenalin:session_token');
+  } catch(e) {}
+}
+
+// Server says our session is gone (expired or invalidated) — drop back to login.
+function handleSessionExpired() {
+  SESSION_TOKEN = null;
+  setStoredToken(null);
+  currentUser = null;
+  stopInboxPolling();
+  showScreen('login');
+  refreshFaceIDLoginUI();
+  var err = document.getElementById('login-err');
+  if (err) { err.textContent = 'Your session expired — please sign in again.'; err.style.display = 'block'; }
+}
 
 function localGet(key) {
   try { var v = localStorage.getItem('adrenalin:' + key); return v ? JSON.parse(v) : null; } catch(e) { return null; }
@@ -1578,9 +1029,8 @@ function localSet(key, value) {
 
 async function kvGet(key) {
   try {
-    var res = await fetch(KV_WORKER_URL + '?key=' + encodeURIComponent(key), {
-      headers: { 'X-Auth-Token': KV_AUTH_TOKEN }
-    });
+    var res = await fetch('/api/kv?key=' + encodeURIComponent(key), { headers: authHeaders() });
+    if (res.status === 401) { handleSessionExpired(); return localGet(key); }
     if (!res.ok) throw new Error('KV get failed');
     var data = await res.json();
     if (data.value !== null && data.value !== undefined) {
@@ -1596,11 +1046,12 @@ async function kvGet(key) {
 async function kvSet(key, value) {
   localSet(key, value);
   try {
-    await fetch(KV_WORKER_URL, {
+    var res = await fetch('/api/kv', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Auth-Token': KV_AUTH_TOKEN },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ key: key, value: value, action: 'set' })
     });
+    if (res.status === 401) handleSessionExpired();
   } catch(e) {
     console.warn('KV set failed, saved locally only:', key);
   }
@@ -1619,50 +1070,43 @@ function apiAppend(key, value) {
 }
 
 
-// Load persisted data for a client into memory on login
+// Load persisted data for a client into memory on login. Profile and
+// sessions_history are no longer fetched here — the server delivers them
+// already merged as part of /api/login or /api/me, atomically with sign-in,
+// so there's no window for a fresh local save to race a stale fetch here.
 async function hydrateClientData(clientKey) {
   const foodKey = clientKey + '_' + getTodayKey();
-  const [foodLog, checkins, messages, sessionHist, savedProfile] = await Promise.all([
+  const [foodLog, checkins, messages] = await Promise.all([
     kvGet('food:' + foodKey),
     kvGet('checkins:' + clientKey),
     kvGet('messages:' + clientKey),
-    kvGet('sessions:' + clientKey),
-    kvGet('profile:' + clientKey),
     kvGet('mymeals:' + clientKey),        // warms local cache — storageGet() below then reads fresh data
     kvGet('daytemplates:' + clientKey)    // same
   ]);
   if (foodLog)  FOOD_LOGS[foodKey] = foodLog;
   if (checkins) CHECKINS[clientKey] = checkins;
   if (messages) MESSAGES[clientKey] = messages;
+}
 
-  const profile = USERS[clientKey] && USERS[clientKey].profile;
-  if (profile) {
-    // Sessions are only ever appended, never deleted. If the client logged a
-    // session locally while this KV fetch was still in flight, the in-memory
-    // list is already longer than the snapshot we just read — keep it rather
-    // than clobbering the fresh session with a stale one from before the save.
-    const existingLen = Array.isArray(profile.sessions_history) ? profile.sessions_history.length : 0;
-    const fetchedLen = Array.isArray(sessionHist) ? sessionHist.length : -1;
-    const staleFetch = fetchedLen < existingLen;
-
-    if (sessionHist && !staleFetch) profile.sessions_history = sessionHist;
-    if (savedProfile) {
-      const merged = Object.assign({}, savedProfile);
-      if (staleFetch) {
-        // Same reasoning — don't let a stale profile snapshot roll back the
-        // session count / "last session" summary a concurrent save already advanced.
-        delete merged.sessions_history;
-        delete merged.sessions;
-        delete merged.lastSession;
-      }
-      Object.assign(profile, merged);
-    }
+// Fetch every client's profile in one authenticated call (admin-only).
+// Replaces the old pattern of iterating a hardcoded client list.
+async function fetchAllClientProfiles() {
+  try {
+    var res = await fetch('/api/clients', { headers: authHeaders() });
+    if (res.status === 401) { handleSessionExpired(); return; }
+    if (!res.ok) return;
+    var data = await res.json();
+    Object.keys(data.clients || {}).forEach(function(k) {
+      USERS[k] = { role: 'client', profile: data.clients[k] };
+    });
+  } catch(e) {
+    console.warn('Failed to fetch client roster:', e);
   }
 }
 
 // Load ALL clients when admin logs in
 async function hydrateAllClientData() {
-  await restoreDynamicClients(); // restore any clients added via Add Client form (now KV-aware, not just local)
+  await fetchAllClientProfiles();
   const clientKeys = Object.keys(USERS).filter(function(k){ return USERS[k].role === 'client'; });
   await Promise.all(clientKeys.map(function(k){ return hydrateClientData(k); }));
 }
@@ -1723,28 +1167,25 @@ function stopInboxPolling() {
   if (_inboxPollTimer) { clearInterval(_inboxPollTimer); _inboxPollTimer = null; }
 }
 
-// ── SHARED POST-AUTH ENTRY (used by password login and Face ID unlock) ──
+// ── SHARED POST-AUTH ENTRY (used by password login, Face ID unlock, and session resume) ──
 async function enterAsUser(username) {
   currentUser = Object.assign({}, USERS[username], { key: username });
   if (currentUser.role === 'admin') {
     showScreen('admin');
     loadAdmin();
     await hydrateAllClientData();
-    loadAdmin(); // re-render overview now that session/check-in data has actually arrived
+    loadAdmin(); // re-render overview now that check-in/food data has actually arrived
     _inboxKnownCount = countInboxItems();
     updateInboxBadge(0);
     startInboxPolling();
   } else {
     showScreen('portal');
     loadPortal();
-    // Await hydration before re-rendering — this used to fire-and-forget,
-    // which let a slow KV fetch resolve *after* the client had already
-    // logged a new session and raced it, silently overwriting the fresh
-    // session_history in memory (and on next save, in KV) with the stale
-    // data that was in flight at login. Same class of bug as the admin
-    // load below, just unfixed on the client path until now.
+    // Profile + sessions_history already arrived atomically with login (see
+    // doLogin/tryResumeSession) — this hydration is just check-ins, messages,
+    // food log, and meal templates, none of which race the render above.
     await hydrateClientData(username);
-    loadPortal(); // re-render overview now that session data has actually arrived
+    loadPortal(); // re-render once that data has actually arrived
   }
 }
 
@@ -1752,20 +1193,63 @@ async function doLogin() {
   const u = document.getElementById('login-user').value.trim().toLowerCase();
   const p = document.getElementById('login-pass').value;
   const err = document.getElementById('login-err');
-  if (USERS[u] && USERS[u].password === p) {
-    err.style.display = 'none';
-    await enterAsUser(u);
-    maybeOfferFaceID(u);
-  } else { err.style.display = 'block'; }
+  err.style.display = 'none';
+  if (!u || !p) { err.textContent = 'Enter a username and password.'; err.style.display = 'block'; return; }
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: u, password: p })
+    });
+    if (!res.ok) {
+      err.textContent = 'Incorrect credentials. Contact Dylan to reset.';
+      err.style.display = 'block';
+      return;
+    }
+    const data = await res.json();
+    SESSION_TOKEN = data.token;
+    setStoredToken(data.token);
+    USERS[data.username] = { role: data.role, profile: data.profile || undefined };
+    await enterAsUser(data.username);
+    maybeOfferFaceID(data.username);
+  } catch (e) {
+    err.textContent = 'Login failed — check your connection and try again.';
+    err.style.display = 'block';
+  }
 }
 
-function doLogout() {
+// Restore a persisted session (stored token) without a password — used on
+// app boot when the client didn't opt into the Face ID gate, and as the
+// unlock step when they did.
+async function tryResumeSession() {
+  const token = getStoredToken();
+  if (!token) return false;
+  SESSION_TOKEN = token;
+  try {
+    const res = await fetch('/api/me', { headers: authHeaders() });
+    if (!res.ok) { setStoredToken(null); SESSION_TOKEN = null; return false; }
+    const data = await res.json();
+    USERS[data.username] = { role: data.role, profile: data.profile || undefined };
+    await enterAsUser(data.username);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+async function doLogout() {
+  const token = SESSION_TOKEN;
+  SESSION_TOKEN = null;
+  setStoredToken(null);
   currentUser = null;
   stopInboxPolling();
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   showScreen('login');
   refreshFaceIDLoginUI(); // if Face ID is set up, show the unlock button again instead of a blank form
+  if (token) {
+    try { await fetch('/api/logout', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } }); } catch (e) {}
+  }
 }
 
 document.addEventListener('keydown', function(e) {
@@ -1813,7 +1297,11 @@ async function enableFaceID(username) {
 async function unlockWithFaceID() {
   var credId = localGet('faceid-credential-id');
   var username = localGet('faceid-user');
-  if (!credId || !username || !webAuthnSupported() || !USERS[username]) return false;
+  var token = getStoredToken();
+  // Face ID is a device-local gate on an already-persisted session, not an
+  // identity check of its own — if there's no stored session token (never
+  // logged in on this device, or it expired), fall back to the password form.
+  if (!credId || !username || !token || !webAuthnSupported()) { showPasswordForm(); return false; }
   try {
     var challenge = crypto.getRandomValues(new Uint8Array(32));
     await navigator.credentials.get({
@@ -1824,8 +1312,9 @@ async function unlockWithFaceID() {
         timeout: 60000
       }
     });
-    await enterAsUser(username); // Face ID matched — straight in, no password
-    return true;
+    var ok = await tryResumeSession(); // Face ID matched — resume the persisted session, no password
+    if (!ok) showPasswordForm();
+    return ok;
   } catch (e) {
     console.warn('[FaceID] unlock failed or cancelled:', e);
     return false;
@@ -1886,8 +1375,18 @@ function dismissFaceIDOffer() {
   if (banner) banner.remove();
 }
 
-// Run on boot: if Face ID is already set up on this device, show the unlock button
-document.addEventListener('DOMContentLoaded', refreshFaceIDLoginUI);
+// Run on boot: resume a persisted session straight in if there's no Face ID
+// gate opted into on this device; otherwise show the "Unlock with Face ID"
+// button (or the password form, if no session/credential is on file at all).
+document.addEventListener('DOMContentLoaded', async function() {
+  var token = getStoredToken();
+  var faceIdReady = webAuthnSupported() && !!localGet('faceid-credential-id');
+  if (token && !faceIdReady) {
+    var ok = await tryResumeSession();
+    if (ok) return;
+  }
+  refreshFaceIDLoginUI();
+});
 
 function showScreen(n) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -3292,7 +2791,7 @@ function generateUsername(name) {
   return name.toLowerCase().replace(/[^a-z0-9]/g,'').substring(0,12);
 }
 
-function createClient() {
+async function createClient() {
   var name     = document.getElementById('ac-name').value.trim();
   var username = document.getElementById('ac-username').value.trim().toLowerCase().replace(/[^a-z0-9]/g,'');
   var password = document.getElementById('ac-password').value.trim();
@@ -3348,16 +2847,27 @@ function createClient() {
     ]
   };
 
-  // Add to USERS
-  USERS[username] = { password: password, role: 'client', profile: profile };
+  // Create the account server-side — this is where the password gets hashed
+  // and stored (authcreds:<username>), never as plaintext.
+  try {
+    var res = await fetch('/api/clients', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ username: username, password: password, profile: profile })
+    });
+    if (res.status === 401) { handleSessionExpired(); return; }
+    if (!res.ok) {
+      var errBody = await res.json().catch(function(){ return {}; });
+      alert('Could not create client: ' + (errBody.error || 'unknown error'));
+      return;
+    }
+  } catch (e) {
+    alert('Could not create client — check your connection and try again.');
+    return;
+  }
 
-  // Persist to localStorage so it survives refresh
-  storageSet('client:' + username, { password: password, role: 'client', profile: profile });
-
-  // Also save full client list so we can restore on next login
-  var clientList = storageGet('clientList') || [];
-  if (!clientList.includes(username)) clientList.push(username);
-  storageSet('clientList', clientList);
+  // Add to in-memory roster for immediate use in this session
+  USERS[username] = { role: 'client', profile: profile };
 
   // Clear form
   ['ac-name','ac-username','ac-password','ac-weight','ac-msg','ac-phase',
@@ -3376,16 +2886,9 @@ function createClient() {
   loadAdmin();
 }
 
-// Restore any dynamically-added clients on admin login
-async function restoreDynamicClients() {
-  var clientList = await kvGet('clientList') || [];
-  await Promise.all(clientList.map(async function(username) {
-    if (!USERS[username]) {
-      var saved = await kvGet('client:' + username);
-      if (saved) USERS[username] = saved;
-    }
-  }));
-}
+// Dynamically-added clients are now indistinguishable from any other client:
+// fetchAllClientProfiles() (via /api/clients) already returns everyone in
+// clientList uniformly, so there's no separate "restore" step needed anymore.
 // ════════════════════════════════════════════════════════
 // END ADD CLIENT
 // ════════════════════════════════════════════════════════
