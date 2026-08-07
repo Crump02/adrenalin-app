@@ -4602,8 +4602,7 @@ loadPortal = function() {
 </div>
 <script>
 // ── VERSION STAMP — increment this on every deploy to force cache refresh ──
-const APP_VERSION = 'v6.2.0';
-const CACHE_NAME = 'adrenalin-' + APP_VERSION;
+const APP_VERSION = 'v6.3.0';
 
 (function(){
   // iOS install tip
@@ -4614,51 +4613,14 @@ const CACHE_NAME = 'adrenalin-' + APP_VERSION;
     if (isIOS && isSafari) setTimeout(function(){ document.getElementById('ios-tip').style.display='block'; }, 3000);
   }
 
-  // Smart service worker — network first, cache fallback, auto-updates on new version
+  // Service worker — network first, cache fallback, auto-updates on new version.
+  // Registered from a real same-origin file (sw.js), not a Blob URL — the
+  // Service Worker spec only allows http(s) script URLs, so a blob: URL
+  // here silently fails registration in every browser. The version is
+  // passed via the registration URL's query string so sw.js doesn't need
+  // its own copy of APP_VERSION to stay in sync with.
   if ('serviceWorker' in navigator) {
-    var SW = `
-const CACHE = '${CACHE_NAME}';
-const URLS = ['/'];
-
-self.addEventListener('install', function(e) {
-  e.waitUntil(
-    caches.open(CACHE).then(function(c){ return c.addAll(URLS); }).catch(function(){})
-  );
-  self.skipWaiting(); // activate immediately
-});
-
-self.addEventListener('activate', function(e) {
-  // Delete ALL old caches that don't match current version
-  e.waitUntil(
-    caches.keys().then(function(keys){
-      return Promise.all(
-        keys.filter(function(k){ return k !== CACHE; })
-           .map(function(k){ console.log('[SW] Deleting old cache:', k); return caches.delete(k); })
-      );
-    })
-  );
-  self.clients.claim(); // take control immediately
-});
-
-self.addEventListener('fetch', function(e) {
-  if (e.request.method !== 'GET') return;
-  // API calls: network only, never cache
-  if (e.request.url.includes('/api') || e.request.url.includes('netlify/functions')) return;
-  // Everything else: network first, fall back to cache
-  e.respondWith(
-    fetch(e.request).then(function(r){
-      var clone = r.clone();
-      caches.open(CACHE).then(function(c){ c.put(e.request, clone); });
-      return r;
-    }).catch(function(){
-      return caches.match(e.request);
-    })
-  );
-});
-`;
-    var blob = new Blob([SW], {type:'application/javascript'});
-    var swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl, {scope: '/'})
+    navigator.serviceWorker.register('/sw.js?v=' + APP_VERSION, {scope: '/'})
       .then(function(reg){
         // Check for updates every time the app is opened
         reg.update();
