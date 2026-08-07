@@ -353,6 +353,11 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
             <div style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);margin-bottom:8px">Or Enter Manually</div>
           </div>
           <div class="field"><label>Food / Meal Name</label><input type="text" id="lf-name" placeholder="e.g. Chicken Rice Bowl"></div>
+          <div class="field" id="lf-servings-row" style="display:none">
+            <label>Servings</label>
+            <input type="number" id="lf-servings" value="1" min="0.25" step="0.25" oninput="recalcServingMacros()">
+            <div style="font-size:.68rem;color:var(--grey);margin-top:4px" id="lf-servings-hint"></div>
+          </div>
           <div class="form-row">
             <div class="field"><label>Calories</label><input type="number" id="lf-kcal" placeholder="0"></div>
             <div class="field"><label>Protein (g)</label><input type="number" id="lf-prot" placeholder="0"></div>
@@ -386,13 +391,15 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
         <div class="log-form" style="margin-bottom:10px">
           <div class="success-toast" id="my-meal-toast">&#10003; Meal saved</div>
           <div class="field"><label>Meal Name</label><input type="text" id="mm-name" placeholder="e.g. Chicken Rice Bowl, Protein Shake"></div>
+          <div class="field"><label>Servings</label><input type="number" id="mm-servings" value="1" min="1" step="1"></div>
+          <div style="font-size:.65rem;color:var(--grey);margin:-6px 0 10px">Leave as 1 for a single portion. If you're entering a whole recipe (e.g. a batch of chilli that makes 4 portions), set servings and enter the <b>total</b> macros for the whole recipe below — macros scale per serving automatically wherever you log it.</div>
           <div class="form-row">
-            <div class="field"><label>Calories</label><input type="number" id="mm-kcal" placeholder="0"></div>
-            <div class="field"><label>Protein (g)</label><input type="number" id="mm-prot" placeholder="0"></div>
+            <div class="field"><label>Calories (total)</label><input type="number" id="mm-kcal" placeholder="0"></div>
+            <div class="field"><label>Protein (g, total)</label><input type="number" id="mm-prot" placeholder="0"></div>
           </div>
           <div class="form-row">
-            <div class="field"><label>Carbs (g)</label><input type="number" id="mm-carb" placeholder="0"></div>
-            <div class="field"><label>Fat (g)</label><input type="number" id="mm-fat" placeholder="0"></div>
+            <div class="field"><label>Carbs (g, total)</label><input type="number" id="mm-carb" placeholder="0"></div>
+            <div class="field"><label>Fat (g, total)</label><input type="number" id="mm-fat" placeholder="0"></div>
           </div>
           <button class="btn-primary" onclick="saveMyMeal()" style="width:100%">Save Meal &#8594;</button>
         </div>
@@ -1765,21 +1772,58 @@ function populateQuickMeals() {
     <div class="quick-meal-card" onclick="quickAddMeal(${i})">
       <div>
         <div class="qm-name">${m.name}</div>
-        <div class="qm-macros">${m.kcal} kcal · <span>${m.prot}g P</span> · ${m.carb}g C · ${m.fat}g F</div>
+        <div class="qm-macros">${m.kcal} kcal · <span>${m.prot}g P</span> · ${m.carb}g C · ${m.fat}g F${m.servings>1?' · makes '+m.servings+' servings':''}</div>
       </div>
       <div class="qm-add">Tap to add →</div>
     </div>`).join('');
 }
 
+// ── RECIPE SERVING-SIZE SCALING ─────────────────────────────────────────
+// Shared by every "quick add" entry point (coach's plan, My Meals, the
+// same list re-surfaced under My Meals). A recipe's stored kcal/prot/
+// carb/fat are the TOTAL for the whole thing — when servings > 1, this
+// pre-fills the Log Food form with a Servings selector that scales those
+// totals down to whatever amount the client is actually having, live, as
+// they adjust it. For an ordinary single-serving entry (servings <= 1,
+// including all pre-existing meals that predate this field) it behaves
+// exactly as before: the entered macros go straight into the form.
+var _quickAddPerServing = null;
+
+function applyQuickAddMeal(m) {
+  const servings = (m.servings && m.servings > 1) ? m.servings : 1;
+  document.getElementById('lf-name').value = m.name;
+  const row = document.getElementById('lf-servings-row');
+  if (servings > 1) {
+    _quickAddPerServing = { kcal: m.kcal/servings, prot: m.prot/servings, carb: m.carb/servings, fat: m.fat/servings };
+    document.getElementById('lf-servings').value = 1;
+    document.getElementById('lf-servings-hint').textContent = 'This recipe makes ' + servings + ' servings — set how many you\'re having.';
+    row.style.display = 'block';
+    recalcServingMacros();
+  } else {
+    _quickAddPerServing = null;
+    row.style.display = 'none';
+    document.getElementById('lf-kcal').value = m.kcal;
+    document.getElementById('lf-prot').value = m.prot;
+    document.getElementById('lf-carb').value = m.carb;
+    document.getElementById('lf-fat').value = m.fat;
+  }
+}
+
+function recalcServingMacros() {
+  if (!_quickAddPerServing) return;
+  const n = parseFloat(document.getElementById('lf-servings').value) || 0;
+  document.getElementById('lf-kcal').value = Math.round(_quickAddPerServing.kcal * n);
+  document.getElementById('lf-prot').value = Math.round(_quickAddPerServing.prot * n);
+  document.getElementById('lf-carb').value = Math.round(_quickAddPerServing.carb * n);
+  document.getElementById('lf-fat').value = Math.round(_quickAddPerServing.fat * n);
+}
+// ── END RECIPE SERVING-SIZE SCALING ─────────────────────────────────────
+
 function quickAddMeal(index) {
   const meals = currentUser.profile.nutrition.meals;
   if (!meals || !meals[index]) return;
   const m = meals[index];
-  document.getElementById('lf-name').value = m.name;
-  document.getElementById('lf-kcal').value = m.kcal;
-  document.getElementById('lf-prot').value = m.prot;
-  document.getElementById('lf-carb').value = m.carb;
-  document.getElementById('lf-fat').value = m.fat;
+  applyQuickAddMeal(m);
   // Auto-detect meal type from name
   const name = m.name.toLowerCase();
   const sel = document.getElementById('lf-meal');
@@ -1811,6 +1855,8 @@ function logFood() {
   document.getElementById('lf-prot').value = '';
   document.getElementById('lf-carb').value = '';
   document.getElementById('lf-fat').value = '';
+  _quickAddPerServing = null;
+  document.getElementById('lf-servings-row').style.display = 'none';
 
   const toast = document.getElementById('log-food-toast');
   toast.style.display = 'block';
@@ -2111,15 +2157,19 @@ function renderMealFields(meals) {
     <div style="background:var(--black);border:1px solid var(--border);padding:12px;margin-bottom:8px">
       <div class="form-row">
         <div class="field"><label>Meal Name</label><input type="text" id="ml-name-${i}" value="${m.name}"></div>
-        <div class="field"><label>Calories</label><input type="number" id="ml-kcal-${i}" value="${m.kcal}"></div>
+        <div class="field"><label>Servings</label><input type="number" id="ml-servings-${i}" value="${m.servings||1}" min="1" step="1"></div>
+      </div>
+      <div style="font-size:.65rem;color:var(--grey);margin:-4px 0 10px">If this is a whole recipe, enter the <b>total</b> macros for all servings below — the app scales macros per serving automatically wherever it's logged.</div>
+      <div class="form-row">
+        <div class="field"><label>Calories (total)</label><input type="number" id="ml-kcal-${i}" value="${m.kcal}"></div>
+        <div class="field"><label>Protein (g, total)</label><input type="number" id="ml-prot-${i}" value="${m.prot}"></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>Protein (g)</label><input type="number" id="ml-prot-${i}" value="${m.prot}"></div>
-        <div class="field"><label>Carbs (g)</label><input type="number" id="ml-carb-${i}" value="${m.carb}"></div>
+        <div class="field"><label>Carbs (g, total)</label><input type="number" id="ml-carb-${i}" value="${m.carb}"></div>
+        <div class="field"><label>Fat (g, total)</label><input type="number" id="ml-fat-${i}" value="${m.fat}"></div>
       </div>
-      <div class="field"><label>Fat (g)</label><input type="number" id="ml-fat-${i}" value="${m.fat}"></div>
       <div class="field"><label>Meal Items (one per line)</label>
-        <textarea id="ml-items-${i}" style="min-height:80px">${m.items.join('\n')}</textarea>
+        <textarea id="ml-items-${i}" style="min-height:80px">${(m.items||[]).join('\n')}</textarea>
       </div>
     </div>`).join('');
   window._mc = meals.length;
@@ -2131,13 +2181,17 @@ function addMealField() {
     <div style="background:var(--black);border:1px solid var(--border);padding:12px;margin-bottom:8px">
       <div class="form-row">
         <div class="field"><label>Meal Name</label><input type="text" id="ml-name-${i}" value="Meal ${i+1}"></div>
-        <div class="field"><label>Calories</label><input type="number" id="ml-kcal-${i}" value="500"></div>
+        <div class="field"><label>Servings</label><input type="number" id="ml-servings-${i}" value="1" min="1" step="1"></div>
+      </div>
+      <div style="font-size:.65rem;color:var(--grey);margin:-4px 0 10px">If this is a whole recipe, enter the <b>total</b> macros for all servings below — the app scales macros per serving automatically wherever it's logged.</div>
+      <div class="form-row">
+        <div class="field"><label>Calories (total)</label><input type="number" id="ml-kcal-${i}" value="500"></div>
+        <div class="field"><label>Protein (g, total)</label><input type="number" id="ml-prot-${i}" value="40"></div>
       </div>
       <div class="form-row">
-        <div class="field"><label>Protein (g)</label><input type="number" id="ml-prot-${i}" value="40"></div>
-        <div class="field"><label>Carbs (g)</label><input type="number" id="ml-carb-${i}" value="50"></div>
+        <div class="field"><label>Carbs (g, total)</label><input type="number" id="ml-carb-${i}" value="50"></div>
+        <div class="field"><label>Fat (g, total)</label><input type="number" id="ml-fat-${i}" value="10"></div>
       </div>
-      <div class="field"><label>Fat (g)</label><input type="number" id="ml-fat-${i}" value="10"></div>
       <div class="field"><label>Items (one per line)</label>
         <textarea id="ml-items-${i}" style="min-height:80px">Meal option — kcal · macros</textarea>
       </div>
@@ -2209,13 +2263,18 @@ function saveEditClient() {
 
   const mc = window._mc||0;
   const meals = [];
-  for(let i=0;i<mc;i++){const n=document.getElementById('ml-name-'+i);if(n){const items=document.getElementById('ml-items-'+i).value.trim().split('\n').filter(Boolean);meals.push({name:n.value,kcal:parseInt(document.getElementById('ml-kcal-'+i).value)||0,prot:parseInt(document.getElementById('ml-prot-'+i).value)||0,carb:parseInt(document.getElementById('ml-carb-'+i).value)||0,fat:parseInt(document.getElementById('ml-fat-'+i).value)||0,items});}}
+  for(let i=0;i<mc;i++){const n=document.getElementById('ml-name-'+i);if(n){const items=document.getElementById('ml-items-'+i).value.trim().split('\n').filter(Boolean);const sv=document.getElementById('ml-servings-'+i);meals.push({name:n.value,servings:(sv&&parseInt(sv.value)>0)?parseInt(sv.value):1,kcal:parseInt(document.getElementById('ml-kcal-'+i).value)||0,prot:parseInt(document.getElementById('ml-prot-'+i).value)||0,carb:parseInt(document.getElementById('ml-carb-'+i).value)||0,fat:parseInt(document.getElementById('ml-fat-'+i).value)||0,items});}}
   if(meals.length)p.nutrition.meals=meals;
 
   const pc = window._pc||0;
   const progress = [];
   for(let i=0;i<pc;i++){const m=document.getElementById('pr-metric-'+i);if(m)progress.push({metric:m.value,start:document.getElementById('pr-start-'+i).value,current:document.getElementById('pr-current-'+i).value,target:document.getElementById('pr-target-'+i).value,pct:parseInt(document.getElementById('pr-pct-'+i).value)||0});}
   if(progress.length)p.progress=progress;
+
+  // Persist to the server — this was previously missing entirely, so every
+  // edit made here (goals, programme, nutrition, meal plan, progress...)
+  // only lived in this admin session's memory and was lost on next login.
+  apiSet('profile:' + key, p);
 
   const t=document.getElementById('edit-toast');
   t.style.display='block';
@@ -3816,6 +3875,8 @@ function toggleMyMealForm() {
 
 function saveMyMeal() {
   var name = document.getElementById('mm-name').value.trim();
+  var servingsEl = document.getElementById('mm-servings');
+  var servings = (servingsEl && parseInt(servingsEl.value) > 0) ? parseInt(servingsEl.value) : 1;
   var kcal = parseInt(document.getElementById('mm-kcal').value) || 0;
   var prot = parseInt(document.getElementById('mm-prot').value) || 0;
   var carb = parseInt(document.getElementById('mm-carb').value) || 0;
@@ -3824,7 +3885,7 @@ function saveMyMeal() {
 
   var key = currentUser.key;
   var myMeals = storageGet('mymeals:' + key) || [];
-  myMeals.unshift({ name:name, kcal:kcal, prot:prot, carb:carb, fat:fat, saved: new Date().toLocaleDateString('en-GB') });
+  myMeals.unshift({ name:name, servings:servings, kcal:kcal, prot:prot, carb:carb, fat:fat, saved: new Date().toLocaleDateString('en-GB') });
   storageSet('mymeals:' + key, myMeals);
 
   // Also add to nutrition.meals so it appears in quick-add
@@ -3832,7 +3893,7 @@ function saveMyMeal() {
     currentUser.profile.nutrition.meals = currentUser.profile.nutrition.meals || [];
     // Add if not already there
     var exists = currentUser.profile.nutrition.meals.some(function(m){ return m.name === name; });
-    if (!exists) currentUser.profile.nutrition.meals.push({ name:name, kcal:kcal, prot:prot, carb:carb, fat:fat });
+    if (!exists) currentUser.profile.nutrition.meals.push({ name:name, servings:servings, kcal:kcal, prot:prot, carb:carb, fat:fat });
     apiSet('profile:' + key, currentUser.profile);
   }
 
@@ -3840,6 +3901,7 @@ function saveMyMeal() {
   ['mm-name','mm-kcal','mm-prot','mm-carb','mm-fat'].forEach(function(id){
     document.getElementById(id).value = '';
   });
+  document.getElementById('mm-servings').value = '1';
   document.getElementById('my-meal-form').style.display = 'none';
 
   var toast = document.getElementById('my-meal-toast');
@@ -3872,14 +3934,10 @@ function quickLogMyMeal(index) {
   var myMeals = storageGet('mymeals:' + key) || [];
   var meal = myMeals[index];
   if (!meal) return;
-  // Open food log form and pre-fill
+  // Open food log form and pre-fill (scales macros by servings if this is a recipe)
   var logArea = document.getElementById('log-form-area');
   if (logArea) logArea.style.display = 'block';
-  document.getElementById('lf-name').value = meal.name;
-  document.getElementById('lf-kcal').value = meal.kcal;
-  document.getElementById('lf-prot').value = meal.prot;
-  document.getElementById('lf-carb').value = meal.carb;
-  document.getElementById('lf-fat').value = meal.fat;
+  applyQuickAddMeal(meal);
   // Switch to nutrition tab
   var nutriTab = document.querySelector('[onclick*="tab-nutrition"]');
   if (nutriTab) nutriTab.click();
@@ -3912,7 +3970,7 @@ function renderMyMeals() {
       return '<div class="quick-meal-card" style="margin-bottom:6px">' +
         '<div>' +
           '<div class="qm-name">' + m.name + '</div>' +
-          '<div class="qm-macros">' + m.kcal + ' kcal &nbsp;&#183;&nbsp; <span>' + m.prot + 'g P</span> &nbsp;&#183;&nbsp; ' + m.carb + 'g C &nbsp;&#183;&nbsp; ' + m.fat + 'g F</div>' +
+          '<div class="qm-macros">' + m.kcal + ' kcal &nbsp;&#183;&nbsp; <span>' + m.prot + 'g P</span> &nbsp;&#183;&nbsp; ' + m.carb + 'g C &nbsp;&#183;&nbsp; ' + m.fat + 'g F' + (m.servings>1?' &nbsp;&#183;&nbsp; makes '+m.servings+' servings':'') + '</div>' +
         '</div>' +
         '<button onclick="quickAddCoachMeal(' + i + ')" style="background:var(--green-dim);border:1px solid var(--green);color:var(--green);padding:5px 10px;font-family:Barlow Condensed,sans-serif;font-weight:700;font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;cursor:pointer">Log</button>' +
       '</div>';
@@ -3926,7 +3984,7 @@ function renderMyMeals() {
       return '<div class="quick-meal-card" style="margin-bottom:6px">' +
         '<div style="flex:1">' +
           '<div class="qm-name">' + m.name + '</div>' +
-          '<div class="qm-macros">' + m.kcal + ' kcal &nbsp;&#183;&nbsp; <span>' + m.prot + 'g P</span> &nbsp;&#183;&nbsp; ' + m.carb + 'g C &nbsp;&#183;&nbsp; ' + m.fat + 'g F</div>' +
+          '<div class="qm-macros">' + m.kcal + ' kcal &nbsp;&#183;&nbsp; <span>' + m.prot + 'g P</span> &nbsp;&#183;&nbsp; ' + m.carb + 'g C &nbsp;&#183;&nbsp; ' + m.fat + 'g F' + (m.servings>1?' &nbsp;&#183;&nbsp; makes '+m.servings+' servings':'') + '</div>' +
           (m.saved ? '<div style="font-size:.62rem;color:var(--grey);margin-top:2px">Added ' + m.saved + '</div>' : '') +
         '</div>' +
         '<div style="display:flex;gap:6px;flex-shrink:0">' +
@@ -3944,11 +4002,7 @@ function quickAddCoachMeal(index) {
   var coachMeals = (currentUser.profile && currentUser.profile.nutrition && currentUser.profile.nutrition.meals) || [];
   var meal = coachMeals[index];
   if (!meal) return;
-  document.getElementById('lf-name').value = meal.name;
-  document.getElementById('lf-kcal').value = meal.kcal;
-  document.getElementById('lf-prot').value = meal.prot;
-  document.getElementById('lf-carb').value = meal.carb;
-  document.getElementById('lf-fat').value = meal.fat;
+  applyQuickAddMeal(meal);
   var logArea = document.getElementById('log-form-area');
   if (logArea) logArea.style.display = 'block';
   var nutriTab = document.querySelector('[onclick*="tab-nutrition"]');
