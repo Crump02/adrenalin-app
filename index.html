@@ -262,6 +262,7 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
         <div class="form-box" style="margin-bottom:14px">
           <h3>Log Session</h3>
           <div class="success-toast" id="client-log-toast">&#10003; Session saved</div>
+          <div class="success-toast" id="client-log-toast-err" style="border-color:#ff4444;color:#ff6b6b;background:rgba(255,68,68,.1)"></div>
           <div class="field"><label>Session Name</label><input type="text" id="cl-title" placeholder="e.g. Push Day, Chest & Tris, Leg Day"></div>
           <div class="field"><label>Date</label><input type="date" id="cl-date"></div>
 
@@ -758,6 +759,7 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
       <div class="section-title">My Training</div>
       <div class="section-sub">Log your own sessions</div>
       <div class="success-toast" id="my-session-toast">&#10003; Session logged</div>
+      <div class="success-toast" id="my-session-toast-err" style="border-color:#ff4444;color:#ff6b6b;background:rgba(255,68,68,.1)"></div>
       <div class="form-box">
         <h3>Log Session</h3>
         <div class="form-row">
@@ -1631,10 +1633,16 @@ async function hydrateClientData(clientKey) {
   if (foodLog)  FOOD_LOGS[foodKey] = foodLog;
   if (checkins) CHECKINS[clientKey] = checkins;
   if (messages) MESSAGES[clientKey] = messages;
-  if (sessionHist && USERS[clientKey] && USERS[clientKey].profile)
-    USERS[clientKey].profile.sessions_history = sessionHist;
   if (savedProfile && USERS[clientKey] && USERS[clientKey].profile)
     Object.assign(USERS[clientKey].profile, savedProfile);
+  // 'sessions:<key>' is the single source of truth for session history — apply it
+  // LAST and always, so a stale sessions_history snapshot embedded in a profile
+  // blob (any profile save — e.g. logging a meal — writes the whole profile object,
+  // including whatever sessions_history happened to be in memory at that moment)
+  // can never clobber the authoritative list. This was the duplicate-key regression:
+  // the two keys drift apart, and Object.assign was letting the stale one win.
+  if (sessionHist && USERS[clientKey] && USERS[clientKey].profile)
+    USERS[clientKey].profile.sessions_history = sessionHist;
 }
 
 // Load ALL clients when admin logs in
@@ -1712,9 +1720,10 @@ async function enterAsUser(username) {
     updateInboxBadge(0);
     startInboxPolling();
   } else {
-    hydrateClientData(username);
     showScreen('portal');
-    loadPortal();
+    loadPortal(); // render immediately from local cache so the UI isn't blank
+    await hydrateClientData(username);
+    loadPortal(); // re-render now that session/check-in data has actually arrived from KV
   }
 }
 
@@ -1884,6 +1893,28 @@ function showAdminTab(id, el) {
 // CLIENT PORTAL
 // ═══════════════════════════════════════════
 
+// ── DAYS-SINCE-SESSION HELPER (shared by client & admin "last session" views) ──
+// Parses the 'en-GB' weekday/day/month/year date string sessions are logged with
+// and returns how many days ago it was, plus a status color for the badge.
+function daysSinceSession(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const parts = dateStr.replace(/[a-zA-Z]+,?\s*/,'').split(' ');
+    const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+    const d = new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
+    if (isNaN(d.getTime())) return null;
+    const diffDays = Math.floor((new Date() - d) / 86400000);
+    const level = diffDays <= 2 ? 'good' : diffDays <= 5 ? 'warn' : 'stale';
+    const colors = {
+      good:  { bg: 'var(--green-dim)', color: 'var(--green)' },
+      warn:  { bg: '#1a1a00',          color: '#f5c400' },
+      stale: { bg: '#1a0000',          color: '#ff4444' }
+    }[level];
+    const label = diffDays === 0 ? 'Today' : diffDays + 'd ago' + (level === 'stale' ? ' ⚠' : '');
+    return { diffDays, label, level, bg: colors.bg, color: colors.color };
+  } catch(e) { return null; }
+}
+
 // ── RENDER LAST SESSION ON OVERVIEW ────────────────────────────────
 function renderLastSession(c) {
   const history = (c.sessions_history && c.sessions_history.length) ? c.sessions_history : [];
@@ -1895,6 +1926,16 @@ function renderLastSession(c) {
   const noteRow = document.getElementById('last-session-note-row');
   const dateEl = document.getElementById('last-session-date');
   const badge = document.getElementById('days-since-badge');
+
+  // Reset to a clean slate every render — otherwise exercises/notes/badge left
+  // over from a previous client or a previous (stale) render can linger on
+  // screen underneath the new session's content.
+  exSection.style.display = 'none';
+  noteRow.style.display = 'none';
+  badge.style.display = 'none';
+  exListEl.innerHTML = '';
+  noteEl.textContent = '';
+  dateEl.textContent = '';
 
   if (!lastSess && c.lastSession) {
     // Fall back to legacy lastSession object
@@ -1910,38 +1951,17 @@ function renderLastSession(c) {
   titleEl.textContent = lastSess.title || '—';
   if (lastSess.date) {
     dateEl.textContent = lastSess.date;
-    // Days since calculation
-    try {
-      const parts = lastSess.date.replace(/[a-zA-Z]+,?\s*/,'').split(' ');
-      const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-      const d = new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
-      const diffDays = Math.floor((new Date() - d) / 86400000);
+    const since = daysSinceSession(lastSess.date);
+    if (since) {
       badge.style.display = 'block';
-      if (diffDays === 0) {
-        badge.textContent = 'Today';
-        badge.style.background = 'var(--green-dim)';
-        badge.style.color = 'var(--green)';
-        badge.style.border = '1px solid var(--green)';
-      } else if (diffDays <= 2) {
-        badge.textContent = diffDays + 'd ago';
-        badge.style.background = 'var(--green-dim)';
-        badge.style.color = 'var(--green)';
-        badge.style.border = '1px solid var(--green)';
-      } else if (diffDays <= 5) {
-        badge.textContent = diffDays + 'd ago';
-        badge.style.background = '#1a1a00';
-        badge.style.color = '#f5c400';
-        badge.style.border = '1px solid #f5c400';
-      } else {
-        badge.textContent = diffDays + 'd ago ⚠';
-        badge.style.background = '#1a0000';
-        badge.style.color = '#ff4444';
-        badge.style.border = '1px solid #ff4444';
-      }
-    } catch(e) {}
+      badge.textContent = since.label;
+      badge.style.background = since.bg;
+      badge.style.color = since.color;
+      badge.style.border = '1px solid ' + since.color;
+    }
   }
 
-  // Exercises
+  // Exercises — full detail: name, sets, reps, weight, per-exercise note
   if (lastSess.exercises && lastSess.exercises.length > 0) {
     exListEl.innerHTML = lastSess.exercises.map(e => `
       <div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
@@ -1951,7 +1971,9 @@ function renderLastSession(c) {
         ${e.note?`<span style="font-size:.68rem;color:var(--grey);font-style:italic">${e.note}</span>`:''}
       </div>`).join('');
     exSection.style.display = 'block';
-  } else if (lastSess.notes) {
+  }
+  // Session notes — shown alongside exercises whenever present, not just as a fallback
+  if (lastSess.notes) {
     noteEl.textContent = lastSess.notes;
     noteRow.style.display = 'block';
   }
@@ -2023,7 +2045,8 @@ function loadPortal() {
                 ${e.weight?'<span style="font-size:.72rem;color:var(--grey)">'+e.weight+'kg</span>':''}
                 ${e.note?'<span style="font-size:.68rem;color:var(--grey);font-style:italic">'+e.note+'</span>':''}
               </div>`).join('')}
-          </div>` : s.notes ? `<div class="session-notes">${s.notes}</div>` : ''}
+          </div>` : ''}
+        ${s.notes ? `<div class="session-notes">${s.notes}</div>` : ''}
       ${s.cardio && s.cardio.length ? `
           <div style="margin-top:6px">
             ${s.cardio.map(c => `
@@ -2240,20 +2263,16 @@ function loadAdmin() {
     const hist = p.sessions_history && p.sessions_history.length ? p.sessions_history : [];
     const last = hist.length > 0 ? hist[0] : null;
     let daysBadge = '';
-    if (last && last.date) {
-      try {
-        const months = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-        const parts = last.date.replace(/[a-zA-Z]+,?\s*/,'').split(' ');
-        const d = new Date(parseInt(parts[2]), months[parts[1]], parseInt(parts[0]));
-        const diff = Math.floor((new Date() - d) / 86400000);
-        const col = diff <= 2 ? 'var(--green)' : diff <= 5 ? '#f5c400' : '#ff4444';
-        const bg = diff <= 2 ? 'var(--green-dim)' : diff <= 5 ? '#1a1a00' : '#1a0000';
-        daysBadge = `<span style="font-size:.6rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.08em;padding:2px 7px;text-transform:uppercase;background:${bg};color:${col};border:1px solid ${col}">${diff===0?'Today':diff+'d ago'}</span>`;
-      } catch(e) {}
+    const since = last ? daysSinceSession(last.date) : null;
+    if (since) {
+      daysBadge = `<span style="font-size:.6rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.08em;padding:2px 7px;text-transform:uppercase;background:${since.bg};color:${since.color};border:1px solid ${since.color}">${since.label}</span>`;
     }
+    // Full inline detail — every exercise (sets, reps, weight), no truncation
     const exHtml = last && last.exercises && last.exercises.length
-      ? last.exercises.slice(0,4).map(e => `<span style="font-size:.68rem;color:var(--grey);margin-right:8px">${e.name} <span style="color:var(--green)">${e.sets}×${e.reps}${e.weight?' @'+e.weight+'kg':''}</span></span>`).join('') + (last.exercises.length > 4 ? `<span style="font-size:.65rem;color:var(--grey)">+${last.exercises.length-4} more</span>` : '')
-      : last && last.notes ? `<span style="font-size:.68rem;color:var(--grey)">${last.notes.substring(0,80)}${last.notes.length>80?'…':''}</span>` : '';
+      ? '<div style="display:flex;flex-wrap:wrap;gap:2px">' + last.exercises.map(e => `<span style="font-size:.68rem;color:var(--grey);margin-right:8px">${e.name} <span style="color:var(--green)">${e.sets}×${e.reps}${e.weight?' @'+e.weight+'kg':''}</span></span>`).join('') + '</div>'
+      : '';
+    const noteHtml = last && last.notes
+      ? `<div style="font-size:.68rem;color:var(--grey);margin-top:${exHtml?'4px':'0'};font-style:italic">${last.notes}</div>` : '';
     return `
     <div class="client-card" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -2272,7 +2291,7 @@ function loadAdmin() {
       ${last ? `
       <div style="border-top:1px solid var(--border);padding-top:7px">
         <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-bottom:3px">Last: ${last.title||'—'} · ${last.date||''}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:2px">${exHtml}</div>
+        ${exHtml}${noteHtml}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2318,7 +2337,10 @@ function logSession() {
     if (!title) { showLogError('Fill in a Session Title before logging.'); return; }
 
     const exercises = getExercises('log-ex-list');
-    const notes = (exercises.length ? exToText(exercises) : '') + (extraNotes ? (exercises.length ? '\n\n' : '') + extraNotes : '');
+    // Keep `notes` as free-text only — exercises are already stored structurally
+    // in `exercises` below, so duplicating them into `notes` as text just forces
+    // every renderer to choose one or the other instead of showing both together.
+    const notes = extraNotes;
 
     const p = USERS[key].profile;
     const ds = new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
@@ -4472,11 +4494,22 @@ function addClientCardio() {
   if (list) list.appendChild(makeCardioRow());
 }
 
+function showClientLogError(msg) {
+  // iOS PWA standalone mode swallows native alert() calls, so validation
+  // feedback for this form has to be an on-page banner instead.
+  var el = document.getElementById('client-log-toast-err');
+  if (!el) { console.error(msg); return; }
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
 function saveClientSession() {
+  document.getElementById('client-log-toast-err').style.display = 'none';
   var title = document.getElementById('cl-title').value.trim();
   var date  = document.getElementById('cl-date').value;
   var notes = document.getElementById('cl-notes').value.trim();
-  if (!title) { alert('Please give your session a name.'); return; }
+  if (!title) { showClientLogError('Please give your session a name.'); return; }
 
   // Collect exercises
   var exercises = [];
@@ -4505,7 +4538,7 @@ function saveClientSession() {
   });
 
   if (exercises.length === 0 && cardio.length === 0) {
-    alert('Please add at least one exercise or cardio activity.'); return;
+    showClientLogError('Please add at least one exercise or cardio activity.'); return;
   }
 
   var ds = date
@@ -4700,6 +4733,8 @@ function removeDylanCardioRow(btn) {
 
 // Override logDylanSession to use exercise builder
 function logDylanSession() {
+  var errEl = document.getElementById('my-session-toast-err');
+  if (errEl) errEl.style.display = 'none';
   var date = document.getElementById('dt-date').value;
   var type = document.getElementById('dt-type').value;
   var extraNotes = document.getElementById('dt-notes').value.trim();
@@ -4732,17 +4767,19 @@ function logDylanSession() {
     if (t) cardio.push({type:t, duration:d, note:n});
   });
 
-  var notes = extraNotes;
-  if (exercises.length) {
-    var exText = exercises.map(function(e,i){
-      var l = (i+1)+'. '+e.name;
-      if (e.sets||e.reps) l += ' — '+e.sets+'x'+e.reps;
-      if (e.weight) l += ' @ '+e.weight+'kg';
-      if (e.note) l += ' ('+e.note+')';
-      return l;
-    }).join('\n');
-    notes = exText + (extraNotes ? '\n\n'+extraNotes : '');
+  if (exercises.length === 0 && cardio.length === 0) {
+    var errEl2 = document.getElementById('my-session-toast-err');
+    if (errEl2) {
+      errEl2.textContent = '⚠ Please add at least one exercise or cardio activity.';
+      errEl2.style.display = 'block';
+      errEl2.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
   }
+
+  // Keep notes as free-text only — exercises/cardio are already stored
+  // structurally above, no need to duplicate them into notes as text.
+  var notes = extraNotes;
 
   var ds = date
     ? new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'})
@@ -4794,7 +4831,7 @@ function renderDylanSessions() {
         '</div>';
       }).join('');
     }
-    if (!exHtml && s.notes) exHtml = '<div style="font-size:.78rem;color:var(--grey);margin-top:4px">'+s.notes+'</div>';
+    if (s.notes) exHtml += '<div style="font-size:.78rem;color:var(--grey);margin-top:4px">'+s.notes+'</div>';
     return '<div class="session-item" style="border-left-color:'+(idx===0?'var(--green)':'var(--border)')+';margin-bottom:8px">' +
       '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
         '<div>' +
