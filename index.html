@@ -238,6 +238,8 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
           <div id="last-ex-list"></div>
         </div>
         <div id="last-session-note-row" style="padding:0 14px 10px;display:none">
+          <div style="height:1px;background:var(--border);margin-bottom:8px" id="last-note-divider"></div>
+          <div style="font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--grey);margin-bottom:4px" id="last-note-label">Notes</div>
           <div style="font-size:.75rem;color:var(--grey);line-height:1.5" id="last-note"></div>
         </div>
       </div>
@@ -262,6 +264,7 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
         <div class="form-box" style="margin-bottom:14px">
           <h3>Log Session</h3>
           <div class="success-toast" id="client-log-toast">&#10003; Session saved</div>
+          <div class="success-toast" id="client-log-toast-err" style="border-color:#ff4444;color:#ff6b6b;background:rgba(255,68,68,.1)"></div>
           <div class="field"><label>Session Name</label><input type="text" id="cl-title" placeholder="e.g. Push Day, Chest & Tris, Leg Day"></div>
           <div class="field"><label>Date</label><input type="date" id="cl-date"></div>
 
@@ -1631,10 +1634,30 @@ async function hydrateClientData(clientKey) {
   if (foodLog)  FOOD_LOGS[foodKey] = foodLog;
   if (checkins) CHECKINS[clientKey] = checkins;
   if (messages) MESSAGES[clientKey] = messages;
-  if (sessionHist && USERS[clientKey] && USERS[clientKey].profile)
-    USERS[clientKey].profile.sessions_history = sessionHist;
-  if (savedProfile && USERS[clientKey] && USERS[clientKey].profile)
-    Object.assign(USERS[clientKey].profile, savedProfile);
+
+  const profile = USERS[clientKey] && USERS[clientKey].profile;
+  if (profile) {
+    // Sessions are only ever appended, never deleted. If the client logged a
+    // session locally while this KV fetch was still in flight, the in-memory
+    // list is already longer than the snapshot we just read — keep it rather
+    // than clobbering the fresh session with a stale one from before the save.
+    const existingLen = Array.isArray(profile.sessions_history) ? profile.sessions_history.length : 0;
+    const fetchedLen = Array.isArray(sessionHist) ? sessionHist.length : -1;
+    const staleFetch = fetchedLen < existingLen;
+
+    if (sessionHist && !staleFetch) profile.sessions_history = sessionHist;
+    if (savedProfile) {
+      const merged = Object.assign({}, savedProfile);
+      if (staleFetch) {
+        // Same reasoning — don't let a stale profile snapshot roll back the
+        // session count / "last session" summary a concurrent save already advanced.
+        delete merged.sessions_history;
+        delete merged.sessions;
+        delete merged.lastSession;
+      }
+      Object.assign(profile, merged);
+    }
+  }
 }
 
 // Load ALL clients when admin logs in
@@ -1712,9 +1735,16 @@ async function enterAsUser(username) {
     updateInboxBadge(0);
     startInboxPolling();
   } else {
-    hydrateClientData(username);
     showScreen('portal');
     loadPortal();
+    // Await hydration before re-rendering — this used to fire-and-forget,
+    // which let a slow KV fetch resolve *after* the client had already
+    // logged a new session and raced it, silently overwriting the fresh
+    // session_history in memory (and on next save, in KV) with the stale
+    // data that was in flight at login. Same class of bug as the admin
+    // load below, just unfixed on the client path until now.
+    await hydrateClientData(username);
+    loadPortal(); // re-render overview now that session data has actually arrived
   }
 }
 
@@ -1884,6 +1914,33 @@ function showAdminTab(id, el) {
 // CLIENT PORTAL
 // ═══════════════════════════════════════════
 
+// ── SHARED: full inline exercise/cardio detail rows for a logged session ──
+// Used by both the client's own "Last Session" Overview card and the
+// admin's per-client "Last Session" summary on the Clients (Overview) tab,
+// so the two views always show the same detail, scoped to that one session.
+function sessionDetailRowsHtml(s) {
+  var rows = '';
+  if (s.exercises && s.exercises.length > 0) {
+    rows += s.exercises.map(e => `
+      <div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="flex:1;font-size:.78rem;color:var(--white)">${e.name}</span>
+        <span style="font-size:.72rem;color:var(--green);font-weight:700;font-family:'Barlow Condensed',sans-serif">${e.sets}×${e.reps}</span>
+        ${e.weight?`<span style="font-size:.72rem;color:var(--grey)">${e.weight}kg</span>`:''}
+        ${e.note?`<span style="font-size:.68rem;color:var(--grey);font-style:italic">${e.note}</span>`:''}
+      </div>`).join('');
+  }
+  if (s.cardio && s.cardio.length > 0) {
+    rows += s.cardio.map(cd => `
+      <div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.65rem;color:var(--green);font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.08em">CARDIO</span>
+        <span style="flex:1;font-size:.78rem;color:var(--white)">${cd.type}</span>
+        ${cd.duration?`<span style="font-size:.72rem;color:var(--grey)">${cd.duration} min</span>`:''}
+        ${cd.note?`<span style="font-size:.68rem;color:var(--grey);font-style:italic">${cd.note}</span>`:''}
+      </div>`).join('');
+  }
+  return rows;
+}
+
 // ── RENDER LAST SESSION ON OVERVIEW ────────────────────────────────
 function renderLastSession(c) {
   const history = (c.sessions_history && c.sessions_history.length) ? c.sessions_history : [];
@@ -1895,6 +1952,18 @@ function renderLastSession(c) {
   const noteRow = document.getElementById('last-session-note-row');
   const dateEl = document.getElementById('last-session-date');
   const badge = document.getElementById('days-since-badge');
+
+  // Reset everything first — this element set is reused across renders
+  // (e.g. right after the client logs a new session), so any section a
+  // previous session needed left visible would otherwise still show its
+  // stale content underneath the new one.
+  titleEl.textContent = '—';
+  dateEl.textContent = '';
+  noteEl.textContent = '';
+  exListEl.innerHTML = '';
+  exSection.style.display = 'none';
+  noteRow.style.display = 'none';
+  badge.style.display = 'none';
 
   if (!lastSess && c.lastSession) {
     // Fall back to legacy lastSession object
@@ -1941,17 +2010,15 @@ function renderLastSession(c) {
     } catch(e) {}
   }
 
-  // Exercises
-  if (lastSess.exercises && lastSess.exercises.length > 0) {
-    exListEl.innerHTML = lastSess.exercises.map(e => `
-      <div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
-        <span style="flex:1;font-size:.78rem;color:var(--white)">${e.name}</span>
-        <span style="font-size:.72rem;color:var(--green);font-weight:700;font-family:'Barlow Condensed',sans-serif">${e.sets}×${e.reps}</span>
-        ${e.weight?`<span style="font-size:.72rem;color:var(--grey)">${e.weight}kg</span>`:''}
-        ${e.note?`<span style="font-size:.68rem;color:var(--grey);font-style:italic">${e.note}</span>`:''}
-      </div>`).join('');
+  // Exercises + cardio — shown together, not either/or, so a session with
+  // both (or a cardio-only session) still shows everything that was logged.
+  var rows = sessionDetailRowsHtml(lastSess);
+  if (rows) {
+    exListEl.innerHTML = rows;
     exSection.style.display = 'block';
-  } else if (lastSess.notes) {
+  }
+  // Session-level notes — shown alongside exercises/cardio, not instead of them.
+  if (lastSess.notes) {
     noteEl.textContent = lastSess.notes;
     noteRow.style.display = 'block';
   }
@@ -2251,9 +2318,9 @@ function loadAdmin() {
         daysBadge = `<span style="font-size:.6rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.08em;padding:2px 7px;text-transform:uppercase;background:${bg};color:${col};border:1px solid ${col}">${diff===0?'Today':diff+'d ago'}</span>`;
       } catch(e) {}
     }
-    const exHtml = last && last.exercises && last.exercises.length
-      ? last.exercises.slice(0,4).map(e => `<span style="font-size:.68rem;color:var(--grey);margin-right:8px">${e.name} <span style="color:var(--green)">${e.sets}×${e.reps}${e.weight?' @'+e.weight+'kg':''}</span></span>`).join('') + (last.exercises.length > 4 ? `<span style="font-size:.65rem;color:var(--grey)">+${last.exercises.length-4} more</span>` : '')
-      : last && last.notes ? `<span style="font-size:.68rem;color:var(--grey)">${last.notes.substring(0,80)}${last.notes.length>80?'…':''}</span>` : '';
+    // Full inline detail of this client's own last session — same markup
+    // as the client's own Overview card, just scoped to their data here.
+    const detailRows = last ? sessionDetailRowsHtml(last) : '';
     return `
     <div class="client-card" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -2271,8 +2338,9 @@ function loadAdmin() {
       </div>
       ${last ? `
       <div style="border-top:1px solid var(--border);padding-top:7px">
-        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-bottom:3px">Last: ${last.title||'—'} · ${last.date||''}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:2px">${exHtml}</div>
+        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-bottom:3px">Last Session: ${last.title||'—'} · ${last.date||''}</div>
+        ${detailRows ? `<div>${detailRows}</div>` : ''}
+        ${last.notes ? `<div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin:6px 0 2px">Notes</div><div style="font-size:.75rem;color:var(--grey);line-height:1.5">${last.notes}</div>` : ''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2280,7 +2348,7 @@ function loadAdmin() {
   const opts = clients.map(([k,u]) => `<option value="${k}">${u.profile.name}</option>`).join('');
   document.getElementById('log-client').innerHTML = opts;
   document.getElementById('edit-client-select').innerHTML = opts;
-  document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('log-date').value = todayLocalISO();
 }
 
 function jumpToLog(key) {
@@ -2302,6 +2370,30 @@ function showLogError(msg) {
   el.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+// ── SESSION DATE HELPERS ──────────────────────────────────────────
+// A <input type="date"> value ("YYYY-MM-DD") must be treated as a LOCAL
+// calendar date. Passing it straight to `new Date(str)` parses it as UTC
+// midnight, which shifts a day backwards once formatted in any timezone
+// behind UTC — a client logging "Aug 5" would get "Aug 4" saved instead.
+// Always go through these two helpers instead of new Date(str)/toISOString().
+function todayLocalISO() {
+  var d = new Date();
+  var m = String(d.getMonth() + 1).padStart(2, '0');
+  var day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+function formatSessionDate(dateStr) {
+  var d;
+  if (dateStr) {
+    var parts = dateStr.split('-');
+    d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  } else {
+    d = new Date();
+  }
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+// ── END SESSION DATE HELPERS ──────────────────────────────────────
+
 function logSession() {
   try {
     document.getElementById('log-toast-err').style.display = 'none';
@@ -2318,22 +2410,29 @@ function logSession() {
     if (!title) { showLogError('Fill in a Session Title before logging.'); return; }
 
     const exercises = getExercises('log-ex-list');
-    const notes = (exercises.length ? exToText(exercises) : '') + (extraNotes ? (exercises.length ? '\n\n' : '') + extraNotes : '');
+    const exerciseText = exercises.length ? exToText(exercises) : '';
+    // Legacy summary text (exercise dump + coach notes combined) — kept for
+    // the Edit Client form / pre-history fallback, which only ever had this
+    // one flattened field to show. The session_history entry below instead
+    // keeps the structured `exercises` array and stores just the coach's
+    // free-text note, so the Overview "Last Session" card can show exercises
+    // and notes side by side without duplicating the exercise list as text.
+    const legacyNote = exerciseText + (extraNotes ? (exerciseText ? '\n\n' : '') + extraNotes : '');
 
     const p = USERS[key].profile;
-    const ds = new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    const ds = formatSessionDate(date);
     if (weight) p.currentWeight = weight;
     if (msg) p.coachMessage = msg;
-    p.lastSession = { title, note: notes };
+    p.lastSession = { title, note: legacyNote };
     if (!Array.isArray(p.sessions_history)) p.sessions_history = [];
-    p.sessions_history.unshift({ date:ds, title, notes, exercises });
+    p.sessions_history.unshift({ date:ds, title, notes: extraNotes, exercises });
     p.sessions = p.sessions_history.length;
     apiSet(`sessions:${key}`, p.sessions_history);
     apiSet(`profile:${key}`, p);
 
     // reset form
     ['log-title','log-notes','log-weight','log-coach-msg'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('log-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('log-date').value = todayLocalISO();
     initEx('log-ex-list', 5);
 
     const t = document.getElementById('log-toast');
@@ -4335,7 +4434,7 @@ function toggleClientLogForm() {
   form.style.display = showing ? 'none' : 'block';
   if (!showing) {
     // Set today's date
-    document.getElementById('cl-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('cl-date').value = todayLocalISO();
     // Init with 1 empty exercise row if list is empty
     var exList = document.getElementById('cl-ex-list');
     if (exList && exList.querySelectorAll('.cl-ex-row').length === 0) {
@@ -4472,11 +4571,25 @@ function addClientCardio() {
   if (list) list.appendChild(makeCardioRow());
 }
 
+// alert() is silent in standalone iOS PWA mode, so validation errors here
+// must go through this on-page banner instead — otherwise tapping "Save
+// Session" with a missing field just does nothing visible, which reads to
+// the client as a failed save.
+function showClientLogError(msg) {
+  var el = document.getElementById('client-log-toast-err');
+  if (!el) { console.error(msg); return; }
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(function(){ el.style.display = 'none'; }, 4000);
+}
+
 function saveClientSession() {
+  document.getElementById('client-log-toast-err').style.display = 'none';
   var title = document.getElementById('cl-title').value.trim();
   var date  = document.getElementById('cl-date').value;
   var notes = document.getElementById('cl-notes').value.trim();
-  if (!title) { alert('Please give your session a name.'); return; }
+  if (!title) { showClientLogError('Please give your session a name.'); return; }
 
   // Collect exercises
   var exercises = [];
@@ -4505,12 +4618,10 @@ function saveClientSession() {
   });
 
   if (exercises.length === 0 && cardio.length === 0) {
-    alert('Please add at least one exercise or cardio activity.'); return;
+    showClientLogError('Please add at least one exercise or cardio activity.'); return;
   }
 
-  var ds = date
-    ? new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'})
-    : new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  var ds = formatSessionDate(date);
 
   var p = currentUser.profile;
   p.sessions_history = p.sessions_history || [];
@@ -4744,9 +4855,7 @@ function logDylanSession() {
     notes = exText + (extraNotes ? '\n\n'+extraNotes : '');
   }
 
-  var ds = date
-    ? new Date(date).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'})
-    : new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  var ds = formatSessionDate(date);
 
   DYLAN_SESSIONS.unshift({ date:ds, type:type, notes:notes, exercises:exercises, cardio:cardio, rating:rating||'—', duration:duration||'—' });
   storageSet('dylan-sessions', DYLAN_SESSIONS);
