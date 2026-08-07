@@ -1012,6 +1012,7 @@ function setStoredToken(t) {
 function handleSessionExpired() {
   SESSION_TOKEN = null;
   setStoredToken(null);
+  clearCachedSessionSnapshot();
   currentUser = null;
   stopInboxPolling();
   showScreen('login');
@@ -1019,6 +1020,51 @@ function handleSessionExpired() {
   var err = document.getElementById('login-err');
   if (err) { err.textContent = 'Your session expired — please sign in again.'; err.style.display = 'block'; }
 }
+
+// ── OFFLINE SESSION FALLBACK ──────────────────────────────────────────
+// A fresh login always needs the server (passwords are only checked
+// server-side, by design). But *resuming* a session you're already logged
+// into shouldn't require a connection just to re-confirm what the device
+// already knows — so the last successful /api/login or /api/me response is
+// cached here, and used only when the resume check can't reach the server
+// at all (not when the server actively rejects the token — see
+// tryResumeSession). Cleared on logout so a shared device doesn't keep
+// showing one client's cached data to whoever opens the app next.
+function cacheSessionSnapshot(username, role, profile) {
+  try { localStorage.setItem('adrenalin:last_session', JSON.stringify({ username: username, role: role, profile: profile })); } catch(e) {}
+}
+function getCachedSessionSnapshot() {
+  try { var v = localStorage.getItem('adrenalin:last_session'); return v ? JSON.parse(v) : null; } catch(e) { return null; }
+}
+function cacheClientRoster(clients) {
+  try { localStorage.setItem('adrenalin:last_clients', JSON.stringify(clients)); } catch(e) {}
+}
+function getCachedClientRoster() {
+  try { var v = localStorage.getItem('adrenalin:last_clients'); return v ? JSON.parse(v) : null; } catch(e) { return null; }
+}
+function clearCachedSessionSnapshot() {
+  try { localStorage.removeItem('adrenalin:last_session'); localStorage.removeItem('adrenalin:last_clients'); } catch(e) {}
+}
+
+function showOfflineBanner() {
+  if (document.getElementById('offline-banner')) return;
+  var host = currentUser && currentUser.role === 'admin' ? document.getElementById('screen-admin') : document.getElementById('screen-portal');
+  if (!host) return;
+  var banner = document.createElement('div');
+  banner.id = 'offline-banner';
+  banner.style.cssText = 'margin:12px 18px;padding:10px 14px;background:#1a1a00;border:1px solid #f5c400;color:#f5c400;font-size:.8rem;font-family:Barlow,sans-serif';
+  banner.textContent = '⚠ Offline — showing your last synced data.';
+  host.prepend(banner);
+}
+function hideOfflineBanner() {
+  var b = document.getElementById('offline-banner');
+  if (b) b.remove();
+}
+// Back online after showing cached data — quietly pull the real thing.
+window.addEventListener('online', function() {
+  if (!document.getElementById('offline-banner')) return;
+  tryResumeSession();
+});
 
 function localGet(key) {
   try { var v = localStorage.getItem('adrenalin:' + key); return v ? JSON.parse(v) : null; } catch(e) { return null; }
@@ -1099,8 +1145,19 @@ async function fetchAllClientProfiles() {
     Object.keys(data.clients || {}).forEach(function(k) {
       USERS[k] = { role: 'client', profile: data.clients[k] };
     });
+    cacheClientRoster(data.clients || {});
+    hideOfflineBanner();
   } catch(e) {
-    console.warn('Failed to fetch client roster:', e);
+    // Couldn't reach the server — fall back to the roster from the last
+    // successful fetch rather than showing an empty Clients tab.
+    console.warn('Failed to fetch client roster, using last cached copy:', e);
+    var cached = getCachedClientRoster();
+    if (cached) {
+      Object.keys(cached).forEach(function(k) {
+        USERS[k] = { role: 'client', profile: cached[k] };
+      });
+      showOfflineBanner();
+    }
   }
 }
 
@@ -1210,6 +1267,7 @@ async function doLogin() {
     SESSION_TOKEN = data.token;
     setStoredToken(data.token);
     USERS[data.username] = { role: data.role, profile: data.profile || undefined };
+    cacheSessionSnapshot(data.username, data.role, data.profile);
     await enterAsUser(data.username);
     maybeOfferFaceID(data.username);
   } catch (e) {
@@ -1227,12 +1285,32 @@ async function tryResumeSession() {
   SESSION_TOKEN = token;
   try {
     const res = await fetch('/api/me', { headers: authHeaders() });
-    if (!res.ok) { setStoredToken(null); SESSION_TOKEN = null; return false; }
+    if (!res.ok) {
+      // Server was reachable and explicitly rejected this token (expired or
+      // revoked) — that's a real "you're logged out", not an offline case,
+      // so don't fall back to cached data here.
+      setStoredToken(null);
+      SESSION_TOKEN = null;
+      clearCachedSessionSnapshot();
+      return false;
+    }
     const data = await res.json();
     USERS[data.username] = { role: data.role, profile: data.profile || undefined };
+    cacheSessionSnapshot(data.username, data.role, data.profile);
     await enterAsUser(data.username);
+    hideOfflineBanner();
     return true;
   } catch (e) {
+    // fetch() itself threw — couldn't reach the server at all (offline).
+    // Fall back to the last-known session for this device instead of
+    // forcing a fresh login, which also can't succeed without a connection.
+    const cached = getCachedSessionSnapshot();
+    if (cached && cached.username) {
+      USERS[cached.username] = { role: cached.role, profile: cached.profile || undefined };
+      await enterAsUser(cached.username);
+      showOfflineBanner();
+      return true;
+    }
     return false;
   }
 }
@@ -1241,8 +1319,10 @@ async function doLogout() {
   const token = SESSION_TOKEN;
   SESSION_TOKEN = null;
   setStoredToken(null);
+  clearCachedSessionSnapshot(); // don't leave one client's cached data for the next person on a shared device
   currentUser = null;
   stopInboxPolling();
+  hideOfflineBanner();
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
   showScreen('login');
