@@ -237,6 +237,9 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
           <div style="height:1px;background:var(--border);margin-bottom:8px"></div>
           <div id="last-ex-list"></div>
         </div>
+        <div id="last-session-cardio-row" style="padding:0 14px 10px;display:none">
+          <div id="last-cardio-list"></div>
+        </div>
         <div id="last-session-note-row" style="padding:0 14px 10px;display:none">
           <div style="font-size:.75rem;color:var(--grey);line-height:1.5" id="last-note"></div>
         </div>
@@ -262,6 +265,7 @@ body{background:var(--black);color:var(--white);font-family:'Barlow',sans-serif;
         <div class="form-box" style="margin-bottom:14px">
           <h3>Log Session</h3>
           <div class="success-toast" id="client-log-toast">&#10003; Session saved</div>
+          <div class="success-toast" id="client-log-toast-err" style="border-color:#ff4444;color:#ff6b6b;background:rgba(255,68,68,.1)"></div>
           <div class="field"><label>Session Name</label><input type="text" id="cl-title" placeholder="e.g. Push Day, Chest & Tris, Leg Day"></div>
           <div class="field"><label>Date</label><input type="date" id="cl-date"></div>
 
@@ -1631,10 +1635,18 @@ async function hydrateClientData(clientKey) {
   if (foodLog)  FOOD_LOGS[foodKey] = foodLog;
   if (checkins) CHECKINS[clientKey] = checkins;
   if (messages) MESSAGES[clientKey] = messages;
-  if (sessionHist && USERS[clientKey] && USERS[clientKey].profile)
-    USERS[clientKey].profile.sessions_history = sessionHist;
+  // `sessions:${key}` is the single source of truth for session history. The
+  // `profile:${key}` blob also carries its own embedded sessions_history — a second,
+  // easily-stale copy that gets rewritten incidentally by unrelated saves (meal log,
+  // check-in target edits, admin "Edit Client", etc). Merge the profile blob FIRST,
+  // then re-apply the canonical session history LAST so a stale embedded copy can never
+  // clobber real session data on load (this was silently reverting/losing sessions).
   if (savedProfile && USERS[clientKey] && USERS[clientKey].profile)
     Object.assign(USERS[clientKey].profile, savedProfile);
+  if (sessionHist && USERS[clientKey] && USERS[clientKey].profile) {
+    USERS[clientKey].profile.sessions_history = sessionHist;
+    USERS[clientKey].profile.sessions = sessionHist.length;
+  }
 }
 
 // Load ALL clients when admin logs in
@@ -1885,6 +1897,9 @@ function showAdminTab(id, el) {
 // ═══════════════════════════════════════════
 
 // ── RENDER LAST SESSION ON OVERVIEW ────────────────────────────────
+// Full inline detail of the client's own most recent session (exercises with sets,
+// reps, weight, any cardio, and notes) plus a days-since-last-session indicator.
+// Scoped entirely to this client's own sessions_history — never reads other clients' data.
 function renderLastSession(c) {
   const history = (c.sessions_history && c.sessions_history.length) ? c.sessions_history : [];
   const lastSess = history.length > 0 ? history[0] : null;
@@ -1892,12 +1907,22 @@ function renderLastSession(c) {
   const noteEl = document.getElementById('last-note');
   const exListEl = document.getElementById('last-ex-list');
   const exSection = document.getElementById('last-session-exercises');
+  const cardioListEl = document.getElementById('last-cardio-list');
+  const cardioRow = document.getElementById('last-session-cardio-row');
   const noteRow = document.getElementById('last-session-note-row');
   const dateEl = document.getElementById('last-session-date');
   const badge = document.getElementById('days-since-badge');
 
+  // Reset — this renders on every loadPortal() call, so stale state from a
+  // previously-shown session must not leak into one that lacks that data.
+  dateEl.textContent = '';
+  badge.style.display = 'none';
+  exSection.style.display = 'none';
+  cardioRow.style.display = 'none';
+  noteRow.style.display = 'none';
+
   if (!lastSess && c.lastSession) {
-    // Fall back to legacy lastSession object
+    // Fall back to legacy lastSession object (no structured history yet)
     titleEl.textContent = c.lastSession.title || '—';
     if (c.lastSession.note && c.lastSession.note !== 'First session notes will appear here.') {
       noteEl.textContent = c.lastSession.note;
@@ -1941,7 +1966,7 @@ function renderLastSession(c) {
     } catch(e) {}
   }
 
-  // Exercises
+  // Exercises — sets, reps, weight, per-exercise note
   if (lastSess.exercises && lastSess.exercises.length > 0) {
     exListEl.innerHTML = lastSess.exercises.map(e => `
       <div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
@@ -1951,8 +1976,29 @@ function renderLastSession(c) {
         ${e.note?`<span style="font-size:.68rem;color:var(--grey);font-style:italic">${e.note}</span>`:''}
       </div>`).join('');
     exSection.style.display = 'block';
-  } else if (lastSess.notes) {
-    noteEl.textContent = lastSess.notes;
+  }
+
+  // Cardio
+  if (lastSess.cardio && lastSess.cardio.length > 0) {
+    cardioListEl.innerHTML = lastSess.cardio.map(cd => `
+      <div style="display:flex;gap:8px;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--green);font-family:'Barlow Condensed',sans-serif;font-weight:700">Cardio</span>
+        <span style="flex:1;font-size:.78rem;color:var(--white)">${cd.type}</span>
+        ${cd.duration?`<span style="font-size:.72rem;color:var(--grey)">${cd.duration} mins</span>`:''}
+        ${cd.note?`<span style="font-size:.68rem;color:var(--grey);font-style:italic">${cd.note}</span>`:''}
+      </div>`).join('');
+    cardioRow.style.display = 'block';
+  }
+
+  // Notes — prefer extraNotes (genuine freeform commentary, kept distinct from the
+  // exercise list). Older admin-logged sessions without extraNotes fall back to
+  // `notes` only when there's no structured exercise list to avoid showing a
+  // text-duplicate of the exercises above.
+  const noteText = lastSess.extraNotes
+    ? lastSess.extraNotes
+    : ((!lastSess.exercises || !lastSess.exercises.length) ? lastSess.notes : '');
+  if (noteText) {
+    noteEl.textContent = noteText;
     noteRow.style.display = 'block';
   }
 }
@@ -2251,9 +2297,33 @@ function loadAdmin() {
         daysBadge = `<span style="font-size:.6rem;font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:.08em;padding:2px 7px;text-transform:uppercase;background:${bg};color:${col};border:1px solid ${col}">${diff===0?'Today':diff+'d ago'}</span>`;
       } catch(e) {}
     }
+    // Full inline detail: every exercise (sets/reps/weight/note), cardio, and notes —
+    // scoped to this client's own last logged session only.
     const exHtml = last && last.exercises && last.exercises.length
-      ? last.exercises.slice(0,4).map(e => `<span style="font-size:.68rem;color:var(--grey);margin-right:8px">${e.name} <span style="color:var(--green)">${e.sets}×${e.reps}${e.weight?' @'+e.weight+'kg':''}</span></span>`).join('') + (last.exercises.length > 4 ? `<span style="font-size:.65rem;color:var(--grey)">+${last.exercises.length-4} more</span>` : '')
-      : last && last.notes ? `<span style="font-size:.68rem;color:var(--grey)">${last.notes.substring(0,80)}${last.notes.length>80?'…':''}</span>` : '';
+      ? last.exercises.map(e => `
+        <div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+          <span style="flex:1;font-size:.72rem;color:var(--white)">${e.name}</span>
+          <span style="font-size:.68rem;color:var(--green);font-weight:700;font-family:'Barlow Condensed',sans-serif">${e.sets}×${e.reps}</span>
+          ${e.weight?`<span style="font-size:.66rem;color:var(--grey)">${e.weight}kg</span>`:''}
+          ${e.note?`<span style="font-size:.62rem;color:var(--grey);font-style:italic">${e.note}</span>`:''}
+        </div>`).join('')
+      : '';
+    const cardioHtml = last && last.cardio && last.cardio.length
+      ? last.cardio.map(cd => `
+        <div style="display:flex;gap:8px;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:.58rem;letter-spacing:.1em;text-transform:uppercase;color:var(--green);font-family:'Barlow Condensed',sans-serif;font-weight:700">Cardio</span>
+          <span style="flex:1;font-size:.72rem;color:var(--white)">${cd.type}</span>
+          ${cd.duration?`<span style="font-size:.66rem;color:var(--grey)">${cd.duration} mins</span>`:''}
+          ${cd.note?`<span style="font-size:.62rem;color:var(--grey);font-style:italic">${cd.note}</span>`:''}
+        </div>`).join('')
+      : '';
+    // Prefer extraNotes (genuine freeform commentary); fall back to legacy `notes`
+    // only when there's no structured exercise list, to avoid showing a text
+    // duplicate of the exercises rendered above.
+    const noteText = last
+      ? (last.extraNotes ? last.extraNotes : ((!last.exercises || !last.exercises.length) ? last.notes : ''))
+      : '';
+    const noteHtml = noteText ? `<div style="font-size:.68rem;color:var(--grey);line-height:1.5;margin-top:4px">${noteText}</div>` : '';
     return `
     <div class="client-card" style="flex-direction:column;align-items:stretch;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center">
@@ -2271,8 +2341,10 @@ function loadAdmin() {
       </div>
       ${last ? `
       <div style="border-top:1px solid var(--border);padding-top:7px">
-        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-bottom:3px">Last: ${last.title||'—'} · ${last.date||''}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:2px">${exHtml}</div>
+        <div style="font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;color:var(--grey);margin-bottom:3px">Last Session: ${last.title||'—'} · ${last.date||''}</div>
+        ${exHtml}
+        ${cardioHtml}
+        ${noteHtml}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -2296,6 +2368,17 @@ function jumpToEdit(key) {
 
 function showLogError(msg) {
   var el = document.getElementById('log-toast-err');
+  if (!el) { console.error(msg); return; }
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// iOS PWA standalone mode swallows native alert() calls silently — a client
+// tapping "Save Session" with an invalid form would see nothing happen at all.
+// Use an on-page banner instead, matching the admin log-form's error toast.
+function showClientLogError(msg) {
+  var el = document.getElementById('client-log-toast-err');
   if (!el) { console.error(msg); return; }
   el.textContent = '⚠ ' + msg;
   el.style.display = 'block';
@@ -2326,7 +2409,7 @@ function logSession() {
     if (msg) p.coachMessage = msg;
     p.lastSession = { title, note: notes };
     if (!Array.isArray(p.sessions_history)) p.sessions_history = [];
-    p.sessions_history.unshift({ date:ds, title, notes, exercises });
+    p.sessions_history.unshift({ date:ds, title, notes, extraNotes, exercises });
     p.sessions = p.sessions_history.length;
     apiSet(`sessions:${key}`, p.sessions_history);
     apiSet(`profile:${key}`, p);
@@ -4473,14 +4556,19 @@ function addClientCardio() {
 }
 
 function saveClientSession() {
+  document.getElementById('client-log-toast-err').style.display = 'none';
   var title = document.getElementById('cl-title').value.trim();
   var date  = document.getElementById('cl-date').value;
   var notes = document.getElementById('cl-notes').value.trim();
-  if (!title) { alert('Please give your session a name.'); return; }
+  if (!title) { showClientLogError('Please give your session a name.'); return; }
 
-  // Collect exercises
+  // Collect exercises — scoped to #cl-ex-list only. Dylan's own "My Training" builder
+  // (#dt-ex-list) reuses these same row/field classes, and every tab's markup stays in
+  // the DOM at once (just hidden), so an unscoped query here would silently pull in his
+  // rows too. This is the same duplicate-class bug logDylanSession() already scopes
+  // around via '#dt-ex-list .cl-ex-row'.
   var exercises = [];
-  document.querySelectorAll('.cl-ex-row').forEach(function(r) {
+  document.querySelectorAll('#cl-ex-list .cl-ex-row').forEach(function(r) {
     var sel = r.querySelector('.cl-ex-select');
     var ci  = r.querySelector('.cl-ex-custom');
     var name = sel ? sel.value : '';
@@ -4495,9 +4583,9 @@ function saveClientSession() {
     });
   });
 
-  // Collect cardio
+  // Collect cardio — scoped to #cl-cardio-list for the same reason as above.
   var cardio = [];
-  document.querySelectorAll('.cl-cardio-row').forEach(function(r) {
+  document.querySelectorAll('#cl-cardio-list .cl-cardio-row').forEach(function(r) {
     var type = (r.querySelector('.cl-cardio-type')||{}).value || '';
     var dur  = (r.querySelector('.cl-cardio-dur')||{}).value || '';
     var note = (r.querySelector('.cl-cardio-note')||{}).value || '';
@@ -4505,7 +4593,7 @@ function saveClientSession() {
   });
 
   if (exercises.length === 0 && cardio.length === 0) {
-    alert('Please add at least one exercise or cardio activity.'); return;
+    showClientLogError('Please add at least one exercise or cardio activity.'); return;
   }
 
   var ds = date
@@ -4514,7 +4602,7 @@ function saveClientSession() {
 
   var p = currentUser.profile;
   p.sessions_history = p.sessions_history || [];
-  p.sessions_history.unshift({ date:ds, title:title, notes:notes, exercises:exercises, cardio:cardio, loggedByClient:true });
+  p.sessions_history.unshift({ date:ds, title:title, notes:notes, extraNotes:notes, exercises:exercises, cardio:cardio, loggedByClient:true });
   p.sessions = p.sessions_history.length;
   p.lastSession = { title:title, note:notes };
 
